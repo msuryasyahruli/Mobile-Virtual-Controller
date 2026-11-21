@@ -1,0 +1,23 @@
+name: wifi_gamepad
+description: Aplikasi WiFi Gamepad wireless controller untuk PC Windows melalui WebSocket lokal.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  web_socket_channel: ^3.0.3
+  shared_preferences: ^2.5.6
+  vibration: ^3.2.1
+  wakelock_plus: ^1.8.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
