@@ -1,14 +1,14 @@
 # VControllers (Flutter Android Client)
 
-Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubung ke PC Windows melalui WebSocket di jaringan WiFi lokal (`ws://<ip>:8765`) dan diteruskan ke virtual Xbox 360 controller menggunakan server Python + ViGEmBus.
+Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubung ke PC Windows melalui WebSocket di jaringan WiFi lokal (`ws://<ip>:<port>`, default port `8765`) dan diteruskan ke virtual Xbox 360 controller menggunakan [Virtual Controller Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) (Python + ViGEmBus).
 
 ## Fitur Utama
 
-- **2 Preset Layout Controller**:
-  - **PlayStation (DualSense)**: Stick simetris, D-Pad recessed, tombol shapes (`△`, `○`, `✕`, `□`), Touchpad interaktif dengan lightbar, `SHARE`, `OPT`, `L1`/`L2`, `R1`/`R2`, serta tombol khusus `L3`/`R3`.
-  - **Xbox Series**: Stick asimetris, Hybrid D-Pad dish, tombol `Y`/`B`/`A`/`X`, `View`, `Menu`, `Share`, `LB`/`LT`, `RB`/`RT`, serta tombol khusus `LS`/`RS`.
-- **Light Mode & Dark Mode**: Switch tema terang/gelap langsung dari top bar (tersimpan otomatis di `SharedPreferences`).
-- **Ukuran Tombol (`S` / `M` / `L`)**: Pilihan ukuran tombol **Smaller**, **Normal**, dan **Larger** agar nyaman di berbagai ukuran tangan dan layar HP.
+- **3 Preset Layout Controller**:
+  - **PlayStation (DualSense)**: Stick simetris, D-Pad recessed, tombol shapes (`△`, `○`, `✕`, `□`), Touchpad interaktif dengan lightbar, `SHARE`, `OPT`, `L1`/`L2`, `R1`/`R2`, macro `M1`/`M2`, serta tombol khusus `L3`/`R3`.
+  - **Xbox Series**: Stick asimetris, Hybrid D-Pad dish, tombol `Y`/`B`/`A`/`X`, `View`, `Menu`, `Share`, `LB`/`LT`, `RB`/`RT`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
+  - **Nintendo Switch Pro**: Stick asimetris dengan aksen Joy-Con (Neon Blue/Red), D-Pad, layout fisik Nintendo (`X` atas, `A` kanan, `B` bawah, `Y` kiri), `−`, `+`, Capture (`●`), `ZL`/`L`, `R`/`ZR`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
+- **Quick Menu Drawer (`☰`)**: Slide-over drawer kanan untuk mengganti preset controller, tema **Dark / Light Mode**, **Haptics**, **Gyro**, slider **Deadzone** (`0%` - `25%`), **HUD Opacity** (`20%` - `100%`), masuk **HUD Edit Mode** (`Smaller` / `Normal` / `Larger` + `Reset`), dan kembali ke **PC Pairing**.
 - **True Multi-Touch**: Menggunakan `Listener` per pointer ID sehingga trigger, bumper, kedua analog stick, D-Pad, dan tombol aksi dapat ditekan bersamaan tanpa konflik.
 - **Responsif & Aman Notch**: Skala proporsional berbasis `LayoutBuilder` (artboard referensi `852 × 393`) dengan padding horizontal simetris terhadap notch/status bar.
 - **Orientasi Otomatis**: Portrait di `ConnectScreen`, otomatis lock Landscape + `WakelockPlus` (layar tetap menyala) saat masuk `GamepadScreen`.
@@ -19,27 +19,33 @@ Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubu
 ```text
 flutter-app/
 ├── android/
-│   └── app/src/main/AndroidManifest.xml   # Permission INTERNET, VIBRATE, WAKE_LOCK & cleartext LAN
+│   └── app/src/main/AndroidManifest.xml        # Permission INTERNET, VIBRATE, WAKE_LOCK & cleartext LAN
 ├── lib/
-│   ├── main.dart                          # Entry point, tema gelap, routing '/' & '/gamepad'
+│   ├── main.dart                               # Entry point, tema, routing '/' & '/gamepad'
 │   ├── models/
-│   │   └── gamepad_input.dart             # Model state tombol & axis + toJson()
+│   │   └── gamepad_input.dart                  # Model state tombol & axis + toJson()
 │   ├── services/
-│   │   └── connection_service.dart        # WebSocket client, auto-reconnect, SharedPreferences IP
+│   │   └── connection_service.dart             # WebSocket client, custom port, auto-reconnect, SharedPreferences
 │   ├── theme/
-│   │   └── gamepad_theme.dart             # Token warna PlayStation & Xbox (Light/Dark) + GamepadButtonSize
+│   │   └── gamepad_theme.dart                  # Token warna PS/Xbox/Switch Pro (Light/Dark), haptics & prefs
 │   ├── screens/
-│   │   ├── connect_screen.dart            # Input IP PC Windows (portrait) & status koneksi
-│   │   └── gamepad_screen.dart            # Layout controller landscape multi-touch
+│   │   ├── connect_screen.dart                 # Input IP & Port PC Windows (portrait) + preset & tema
+│   │   ├── gamepad_screen.dart                 # Host screen, Quick Menu Drawer & HUD Edit toolbar
+│   │   ├── gamepad_layout_parts.dart           # Shared canvas shell, top status bar, utility & macro buttons
+│   │   ├── playstation_gamepad_screen.dart     # Layout PlayStation DualSense
+│   │   ├── xbox_gamepad_screen.dart            # Layout Xbox Series
+│   │   └── switch_pro_gamepad_screen.dart      # Layout Nintendo Switch Pro
 │   └── widgets/
-│       ├── dedicated_stick_click_button.dart  # Tombol pill L3/R3 & LS/RS
-│       ├── gamepad_dpad.dart                  # D-Pad 8-arah / diagonal slide
-│       ├── gamepad_face_buttons.dart          # Cluster tombol aksi diamond
-│       ├── gamepad_shoulder_button.dart       # Tombol L1/L2/R1/R2 & LB/LT/RB/RT
-│       ├── gamepad_thumbstick.dart            # Analog stick multi-touch dengan spring-back
-│       └── gamepad_touchpad.dart              # Touchpad DualSense dengan indikator sentuhan
+│       ├── dedicated_stick_click_button.dart   # Tombol pill L3/R3 & LS/RS
+│       ├── gamepad_dpad.dart                   # D-Pad 8-arah / diagonal slide
+│       ├── gamepad_face_buttons.dart           # Cluster tombol aksi diamond
+│       ├── gamepad_shoulder_button.dart        # Tombol L1/L2/R1/R2, LB/LT/RB/RT, ZL/L/R/ZR
+│       ├── gamepad_thumbstick.dart             # Analog stick multi-touch dengan radial deadzone
+│       ├── gamepad_touchpad.dart               # Touchpad DualSense dengan indikator sentuhan
+│       └── quick_menu_drawer.dart              # Slide-over Quick Menu Drawer (Dark & Light mode)
 ├── test/
-│   └── widget_test.dart                   # Widget test ConnectScreen & GamepadScreen
+│   └── widget_test.dart                        # Widget test ConnectScreen, layouts & QuickMenuDrawer
+├── LICENSE
 └── pubspec.yaml
 ```
 
@@ -78,20 +84,24 @@ flutter-app/
 }
 ```
 
-> Catatan: Pada layout PlayStation, `✕` dipetakan ke `A`, `○` ke `B`, `□` ke `X`, `△` ke `Y`, `SHARE`/Touchpad ke `SELECT`, dan `OPT` ke `START`.
+> Catatan: Pada layout PlayStation, `✕` dipetakan ke `A`, `○` ke `B`, `□` ke `X`, `△` ke `Y`, `SHARE`/Touchpad ke `SELECT`, dan `OPT` ke `START`. Pada layout Switch Pro, tata letak fisik Nintendo dipetakan sesuai standar (`B` bawah -> `A`, `A` kanan -> `B`, `Y` kiri -> `X`, `X` atas -> `Y`, `−` -> `SELECT`, `+` -> `START`).
 
 ## Prasyarat
 
 - Flutter SDK (Dart `>=3.2.0 <4.0.0`)
 - Android SDK & perangkat Android (atau emulator)
-- Server WebSocket penerima di PC Windows pada port `8765` (dari repository terpisah, atau server kustom apa pun yang mengikuti format protokol JSON di atas)
+- Server WebSocket penerima di PC Windows pada port `8765` dari repository [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) (atau server kustom apa pun yang mengikuti format protokol JSON di atas)
 - HP Android dan PC Windows terhubung di jaringan WiFi yang sama
 
 ## Cara Menjalankan
 
 1. **Siapkan & jalankan server WebSocket di PC Windows**
-   - Jalankan aplikasi server WebSocket VControllers (repository terpisah) pada port `8765`, atau gunakan server WebSocket kustom yang membaca payload JSON di atas.
-   - Pastikan Windows Firewall mengizinkan koneksi masuk TCP port `8765` dan catat alamat IP lokal PC Windows.
+   - Clone dan jalankan server dari repository resmi:
+     ```bash
+     git clone https://github.com/msuryasyahruli/Virtual-Controller-Server.git
+     ```
+   - Ikuti petunjuk instalasi di [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) untuk menjalankan server pada port `8765` (atau port kustom).
+   - Pastikan Windows Firewall mengizinkan koneksi masuk TCP pada port yang digunakan dan catat alamat IP lokal PC Windows.
 
 2. **Install dependensi & jalankan aplikasi Flutter**:
    ```bash
@@ -100,14 +110,18 @@ flutter-app/
    ```
 
 3. **Hubungkan di HP**:
-   - Masukkan IP lokal PC Windows pada layar `ConnectScreen`, lalu tekan **Connect**.
+   - Masukkan IP lokal dan port PC Windows pada layar `ConnectScreen`, lalu tekan **Connect to PC**.
    - Setelah terhubung, aplikasi otomatis masuk ke `GamepadScreen` (landscape).
-   - Gunakan top bar untuk mengganti preset **PS5 / XBOX**, ukuran tombol **S / M / L**, tema **Light / Dark**, atau **Disconnect**.
+   - Buka **Quick Menu Drawer** lewat tombol `☰` di top bar untuk mengganti preset **PS5 / Xbox / Switch**, tema **Light / Dark**, **Haptics**, **Gyro**, **Deadzone**, **HUD Opacity**, **Edit HUD Layout**, atau kembali ke **PC Pairing**.
 
 ## Pengujian & Build APK
 
 ```bash
-flutter analyze
+flutter analyze --no-fatal-infos
 flutter test
 flutter build apk --debug
 ```
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah [MIT License](LICENSE).
