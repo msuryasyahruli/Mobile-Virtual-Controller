@@ -24,7 +24,8 @@ class ConnectionService {
   /// Timeout handshake WebSocket agar tidak menggantung pada IP yang tidak aktif.
   static const Duration connectTimeout = Duration(seconds: 5);
 
-  static const String _lastIpPrefKey = 'wifi_gamepad_last_ip';
+  static const String _lastIpPrefKey = 'vcontrollers_last_ip';
+  static const String _lastPortPrefKey = 'vcontrollers_last_port';
 
   /// Instance tunggal [ConnectionService] yang digunakan bersama antar screen.
   static final ConnectionService instance = ConnectionService._internal();
@@ -35,6 +36,8 @@ class ConnectionService {
 
   final StreamController<ConnectionStatus> _statusController =
       StreamController<ConnectionStatus>.broadcast();
+  final StreamController<String?> _errorController =
+      StreamController<String?>.broadcast();
 
   SharedPreferences? _prefs;
   WebSocketChannel? _channel;
@@ -43,17 +46,28 @@ class ConnectionService {
 
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _currentIp;
+  int _currentPort = serverPort;
+  String? _lastError;
   bool _shouldReconnect = false;
   int _connectionGeneration = 0;
 
   /// Stream perubahan status koneksi WebSocket.
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
 
+  /// Stream pesan error dari server (misalnya penolakan client kedua).
+  Stream<String?> get errorStream => _errorController.stream;
+
   /// Status koneksi saat ini.
   ConnectionStatus get currentStatus => _status;
 
   /// Alamat IP server yang sedang digunakan atau terakhir dihubungkan.
   String? get currentIp => _currentIp;
+
+  /// Port server yang sedang digunakan atau terakhir dihubungkan.
+  int get currentPort => _currentPort;
+
+  /// Pesan error terakhir dari server jika ada.
+  String? get lastError => _lastError;
 
   /// Inisialisasi SharedPreferences untuk menyimpan dan memuat IP terakhir.
   Future<void> init([SharedPreferences? prefs]) async {
@@ -72,8 +86,20 @@ class ConnectionService {
     await _prefs?.setString(_lastIpPrefKey, ip.trim());
   }
 
-  /// Membuka koneksi WebSocket ke `ws://<ip>:8765` dan mengaktifkan auto-reconnect.
-  Future<void> connect(String ip) async {
+  /// Memuat port terakhir yang tersimpan di SharedPreferences.
+  Future<int> loadLastPort() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs?.getInt(_lastPortPrefKey) ?? serverPort;
+  }
+
+  /// Menyimpan port terakhir ke SharedPreferences.
+  Future<void> saveLastPort(int port) async {
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs?.setInt(_lastPortPrefKey, port);
+  }
+
+  /// Membuka koneksi WebSocket ke `ws://<ip>:<port>` dan mengaktifkan auto-reconnect.
+  Future<void> connect(String ip, {int port = serverPort}) async {
     final sanitizedIp = ip.trim();
     if (sanitizedIp.isEmpty) {
       _updateStatus(ConnectionStatus.disconnected);
@@ -81,18 +107,22 @@ class ConnectionService {
     }
 
     _currentIp = sanitizedIp;
+    _currentPort = (port >= 1 && port <= 65535) ? port : serverPort;
+    _setError(null);
     _shouldReconnect = true;
     _connectionGeneration++;
     await saveLastIp(sanitizedIp);
+    await saveLastPort(_currentPort);
 
     _cancelReconnectTimer();
     await _closeChannel();
-    await _openConnection(sanitizedIp);
+    await _openConnection(sanitizedIp, _currentPort);
   }
 
   /// Menutup koneksi secara manual dan mematikan auto-reconnect.
   Future<void> disconnect() async {
     _shouldReconnect = false;
+    _setError(null);
     _connectionGeneration++;
     _cancelReconnectTimer();
     await _closeChannel();
@@ -114,13 +144,13 @@ class ConnectionService {
   }
 
   /// Melakukan proses koneksi WebSocket dengan penanganan error yang aman.
-  Future<void> _openConnection(String ip) async {
+  Future<void> _openConnection(String ip, int port) async {
     final generation = ++_connectionGeneration;
     _updateStatus(ConnectionStatus.reconnecting);
 
     WebSocketChannel? pendingChannel;
     try {
-      final uri = Uri.parse('ws://$ip:$serverPort');
+      final uri = Uri.parse('ws://$ip:$port');
       pendingChannel = WebSocketChannel.connect(uri);
       await pendingChannel.ready.timeout(connectTimeout);
 
@@ -132,8 +162,8 @@ class ConnectionService {
 
       _channel = pendingChannel;
       _channelSubscription = _channel!.stream.listen(
-        (_) {},
-        onDone: () => _handleUnexpectedDisconnect(generation),
+        (message) => _handleServerMessage(message, generation),
+        onDone: () => _handleStreamDone(generation),
         onError: (Object _) => _handleUnexpectedDisconnect(generation),
         cancelOnError: true,
       );
@@ -145,6 +175,49 @@ class ConnectionService {
         _handleUnexpectedDisconnect(generation);
       }
     }
+  }
+
+  /// Memproses pesan JSON dari server VControllers (mis. penolakan client kedua).
+  void _handleServerMessage(dynamic message, int generation) {
+    if (generation != _connectionGeneration) return;
+    if (message is! String) return;
+
+    try {
+      final decoded = jsonDecode(message);
+      if (decoded is Map<String, dynamic> && decoded['type'] == 'error') {
+        final serverMsg =
+            decoded['message']?.toString().trim() ?? 'Connection rejected by server';
+        _rejectConnection(generation, serverMsg);
+      }
+    } catch (_) {
+      // Abaikan pesan non-JSON dari server.
+    }
+  }
+
+  /// Menangani penutupan stream dari server; hentikan auto-reconnect jika kode 1008.
+  void _handleStreamDone(int generation) {
+    if (generation != _connectionGeneration) return;
+    if (_channel?.closeCode == 1008) {
+      final reason = _channel?.closeReason?.trim();
+      _rejectConnection(
+        generation,
+        (reason != null && reason.isNotEmpty)
+            ? reason
+            : (_lastError ?? 'Another client is already connected'),
+      );
+      return;
+    }
+    _handleUnexpectedDisconnect(generation);
+  }
+
+  /// Menghentikan auto-reconnect dan menyimpan pesan error penolakan server.
+  void _rejectConnection(int generation, String message) {
+    if (generation != _connectionGeneration) return;
+    _shouldReconnect = false;
+    _cancelReconnectTimer();
+    _setError(message);
+    unawaited(_closeChannel());
+    _updateStatus(ConnectionStatus.disconnected);
   }
 
   /// Menangani kondisi koneksi putus dan menjadwalkan auto-reconnect setiap 3 detik.
@@ -171,7 +244,7 @@ class ConnectionService {
       if (!_shouldReconnect || _currentIp == null || _currentIp!.isEmpty) {
         return;
       }
-      _openConnection(_currentIp!);
+      _openConnection(_currentIp!, _currentPort);
     });
   }
 
@@ -213,9 +286,19 @@ class ConnectionService {
     }
   }
 
+  /// Memperbarui pesan error terakhir dan menyiarkannya ke listener.
+  void _setError(String? message) {
+    if (_lastError == message) return;
+    _lastError = message;
+    if (!_errorController.isClosed) {
+      _errorController.add(message);
+    }
+  }
+
   /// Membersihkan seluruh resource ketika service tidak lagi digunakan.
   Future<void> dispose() async {
     await disconnect();
     await _statusController.close();
+    await _errorController.close();
   }
 }

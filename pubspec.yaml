@@ -1,5 +1,5 @@
-name: wifi_gamepad
-description: Aplikasi WiFi Gamepad wireless controller untuk PC Windows melalui WebSocket lokal.
+name: vcontrollers
+description: VControllers wireless gamepad client for Windows PC over local WebSocket.
 publish_to: 'none'
 version: 1.0.0+1
 

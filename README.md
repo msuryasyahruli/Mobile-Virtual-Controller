@@ -1,4 +1,4 @@
-# WiFi Gamepad (Flutter Android Client)
+# VControllers (Flutter Android Client)
 
 Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubung ke PC Windows melalui WebSocket di jaringan WiFi lokal (`ws://<ip>:8765`) dan diteruskan ke virtual Xbox 360 controller menggunakan server Python + ViGEmBus.
 
@@ -90,7 +90,7 @@ flutter-app/
 ## Cara Menjalankan
 
 1. **Siapkan & jalankan server WebSocket di PC Windows**
-   - Jalankan aplikasi server WebSocket WiFi Gamepad (repository terpisah) pada port `8765`, atau gunakan server WebSocket kustom yang membaca payload JSON di atas.
+   - Jalankan aplikasi server WebSocket VControllers (repository terpisah) pada port `8765`, atau gunakan server WebSocket kustom yang membaca payload JSON di atas.
    - Pastikan Windows Firewall mengizinkan koneksi masuk TCP port `8765` dan catat alamat IP lokal PC Windows.
 
 2. **Install dependensi & jalankan aplikasi Flutter**:

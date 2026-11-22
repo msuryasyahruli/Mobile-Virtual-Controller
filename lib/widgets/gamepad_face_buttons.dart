@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/gamepad_theme.dart';
 
@@ -141,7 +140,7 @@ class _FaceActionButtonState extends State<_FaceActionButton> {
     _activePointers.add(event.pointer);
     if (!wasPressed) {
       setState(() {});
-      HapticFeedback.lightImpact();
+      GamepadHaptics.lightImpact();
       widget.onChanged(true);
     }
   }
@@ -166,62 +165,62 @@ class _FaceActionButtonState extends State<_FaceActionButton> {
         ) ??
         theme.faceCapFill;
 
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: _handleDown,
-      onPointerUp: (e) => _handleEnd(e.pointer),
-      onPointerCancel: (e) => _handleEnd(e.pointer),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 65),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 70),
-          width: widget.size,
-          height: widget.size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _isPressed ? pressedFill : theme.faceCapFill,
-            border: Border.all(
-              color: accent,
-              width: widget.token.borderWidth,
+    return Semantics(
+      button: true,
+      label: 'Button ${widget.token.label}',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _handleDown,
+          onPointerUp: (e) => _handleEnd(e.pointer),
+          onPointerCancel: (e) => _handleEnd(e.pointer),
+          child: AnimatedScale(
+            scale: _isPressed ? 0.94 : 1.0,
+            duration: const Duration(milliseconds: 65),
+            curve: Curves.easeOut,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 70),
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isPressed ? pressedFill : theme.faceCapFill,
+                border: Border.all(
+                  color: accent,
+                  width: widget.token.borderWidth,
+                ),
+                boxShadow: _isPressed
+                    ? [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          spreadRadius: 0.5,
+                        ),
+                      ]
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: widget.shape != null
+                  ? CustomPaint(
+                      size: Size.square(widget.size * 0.44),
+                      painter: _PlayStationGlyphPainter(
+                        shape: widget.shape!,
+                        color: accent,
+                        strokeWidth: (widget.size * 0.055).clamp(1.6, 2.4),
+                      ),
+                    )
+                  : Text(
+                      widget.token.label,
+                      style: TextStyle(
+                        color: widget.token.effectiveTextColor,
+                        fontSize: widget.size * 0.44,
+                        fontWeight: FontWeight.w800,
+                        height: 1.0,
+                      ),
+                    ),
             ),
-            boxShadow: [
-              if (_isPressed)
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.45),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                )
-              else
-                BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: theme.isDark ? 0.35 : 0.08,
-                  ),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1.5),
-                ),
-            ],
           ),
-          alignment: Alignment.center,
-          child: widget.shape != null
-              ? CustomPaint(
-                  size: Size.square(widget.size * 0.44),
-                  painter: _PlayStationGlyphPainter(
-                    shape: widget.shape!,
-                    color: accent,
-                    strokeWidth: (widget.size * 0.055).clamp(1.6, 2.4),
-                  ),
-                )
-              : Text(
-                  widget.token.label,
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: widget.size * 0.44,
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                ),
         ),
       ),
     );

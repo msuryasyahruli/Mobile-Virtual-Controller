@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/gamepad_theme.dart';
 
@@ -113,7 +112,7 @@ class _GamepadDPadState extends State<GamepadDPad> {
     });
 
     if (newlyActivated) {
-      HapticFeedback.lightImpact();
+      GamepadHaptics.lightImpact();
     }
 
     widget.onChanged(_up, _down, _left, _right);
@@ -151,22 +150,15 @@ class _GamepadDPadState extends State<GamepadDPad> {
             color: isActive ? activeBorder : theme.dpadCapBorder,
             width: isActive ? 1.5 : 1.0,
           ),
-          boxShadow: [
-            if (isActive)
-              BoxShadow(
-                color: activeBorder.withValues(alpha: 0.35),
-                blurRadius: 8,
-                spreadRadius: 0.5,
-              )
-            else
-              BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: theme.isDark ? 0.35 : 0.07,
-                ),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-          ],
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: activeBorder.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    spreadRadius: 0.5,
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Icon(
@@ -182,18 +174,19 @@ class _GamepadDPadState extends State<GamepadDPad> {
   Widget build(BuildContext context) {
     final theme = widget.theme;
     final isXbox = theme.style == GamepadStyle.xbox;
+    final useEnlargedCaps = theme.style != GamepadStyle.playstation;
     final size = widget.size;
 
     // Exact proportional ratios:
-    // Xbox Hybrid dish (132): vertical 36x44, horizontal 44x36, hub 34x34.
+    // Xbox / Switch Pro (132): vertical 36x44, horizontal 44x36, hub 34x34.
     // PlayStation recessed (144): vertical 34x44, horizontal 44x34, hub 30x30.
-    final double vertW = size * (isXbox ? 36 / 132 : 34 / 144);
-    final double vertH = size * (isXbox ? 44 / 132 : 44 / 144);
-    final double horizW = size * (isXbox ? 44 / 132 : 44 / 144);
-    final double horizH = size * (isXbox ? 36 / 132 : 34 / 144);
-    final double hubSize = size * (isXbox ? 34 / 132 : 30 / 144);
-    final double edgeInset = size * (isXbox ? 7 / 132 : 10 / 144);
-    final double capRadius = size * (isXbox ? 8 / 132 : 7 / 144);
+    final double vertW = size * (useEnlargedCaps ? 36 / 132 : 34 / 144);
+    final double vertH = size * (useEnlargedCaps ? 44 / 132 : 44 / 144);
+    final double horizW = size * (useEnlargedCaps ? 44 / 132 : 44 / 144);
+    final double horizH = size * (useEnlargedCaps ? 36 / 132 : 34 / 144);
+    final double hubSize = size * (useEnlargedCaps ? 34 / 132 : 30 / 144);
+    final double edgeInset = size * (useEnlargedCaps ? 7 / 132 : 10 / 144);
+    final double capRadius = size * (useEnlargedCaps ? 8 / 132 : 7 / 144);
     final double iconSize = size * 0.145;
     final bool anyActive = _up || _down || _left || _right;
 

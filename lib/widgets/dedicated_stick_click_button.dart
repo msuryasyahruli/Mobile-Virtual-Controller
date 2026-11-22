@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/gamepad_theme.dart';
 
@@ -51,7 +50,7 @@ class _DedicatedStickClickButtonState extends State<DedicatedStickClickButton> {
     _activePointers.add(event.pointer);
     if (!wasPressed) {
       setState(() {});
-      HapticFeedback.lightImpact();
+      GamepadHaptics.lightImpact();
       widget.onPressed(true);
     }
   }
@@ -70,44 +69,58 @@ class _DedicatedStickClickButtonState extends State<DedicatedStickClickButton> {
     final theme = widget.theme;
     final accent = theme.statusAccent;
 
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: _handleDown,
-      onPointerUp: (e) => _handleEnd(e.pointer),
-      onPointerCancel: (e) => _handleEnd(e.pointer),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 65),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 70),
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            color: _isPressed ? theme.buttonPressedFill : theme.buttonFill,
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            border: Border.all(
-              color: _isPressed ? accent : theme.buttonBorder,
-              width: _isPressed ? 1.4 : 1.0,
-            ),
-            boxShadow: _isPressed
-                ? [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      spreadRadius: 0.5,
+    return Semantics(
+      button: true,
+      label: 'Stick click ${widget.label}',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _handleDown,
+          onPointerUp: (e) => _handleEnd(e.pointer),
+          onPointerCancel: (e) => _handleEnd(e.pointer),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            child: Center(
+              child: AnimatedScale(
+                scale: _isPressed ? 0.94 : 1.0,
+                duration: const Duration(milliseconds: 65),
+                curve: Curves.easeOut,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 70),
+                  width: widget.width,
+                  height: widget.height,
+                  decoration: BoxDecoration(
+                    color: _isPressed
+                        ? theme.buttonPressedFill
+                        : theme.buttonFill,
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                    border: Border.all(
+                      color: _isPressed ? accent : theme.buttonBorder,
+                      width: _isPressed ? 1.4 : 1.0,
                     ),
-                  ]
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: _isPressed ? accent : theme.textPrimary,
-              fontSize: (widget.height * 0.36).clamp(10.0, 14.0),
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+                    boxShadow: _isPressed
+                        ? [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              spreadRadius: 0.5,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: _isPressed ? accent : theme.textPrimary,
+                      fontSize: (widget.height * 0.36).clamp(10.0, 14.0),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),

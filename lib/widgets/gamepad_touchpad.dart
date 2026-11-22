@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../theme/gamepad_theme.dart';
 
@@ -52,7 +51,7 @@ class _GamepadTouchpadState extends State<GamepadTouchpad> {
     _updateTouchPosition(event.localPosition);
 
     if (!wasPressed) {
-      HapticFeedback.lightImpact();
+      GamepadHaptics.lightImpact();
       widget.onPressed(true);
     }
   }
@@ -101,13 +100,18 @@ class _GamepadTouchpadState extends State<GamepadTouchpad> {
     final lightbarTop = widget.height * (10 / 160);
     final dotSize = (widget.height * 0.16).clamp(18.0, 28.0);
 
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: _handleDown,
-      onPointerMove: _handleMove,
-      onPointerUp: (e) => _handleEnd(e.pointer),
-      onPointerCancel: (e) => _handleEnd(e.pointer),
-      child: AnimatedScale(
+    return Semantics(
+      button: true,
+      label: 'PlayStation Touchpad',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _handleDown,
+          onPointerMove: _handleMove,
+          onPointerUp: (e) => _handleEnd(e.pointer),
+          onPointerCancel: (e) => _handleEnd(e.pointer),
+          child: AnimatedScale(
         scale: _isPressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 70),
         curve: Curves.easeOut,
@@ -192,10 +196,12 @@ class _GamepadTouchpadState extends State<GamepadTouchpad> {
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
