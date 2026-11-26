@@ -7,8 +7,12 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/gamepad_input.dart';
 import '../services/connection_service.dart';
 import '../theme/gamepad_theme.dart';
+import '../widgets/pc_suite_parts.dart';
 import '../widgets/quick_menu_drawer.dart';
 import 'gamepad_layout_parts.dart';
+import 'hybrid_wasd_trackpad_screen.dart';
+import 'pc_keyboard_screen.dart';
+import 'pc_trackpad_screen.dart';
 import 'playstation_gamepad_screen.dart';
 import 'switch_pro_gamepad_screen.dart';
 import 'xbox_gamepad_screen.dart';
@@ -66,12 +70,24 @@ class _GamepadScreenState extends State<GamepadScreen> {
     });
   }
 
-  /// Locks landscape orientation, enables immersive full-bleed mode, and keeps screen awake.
+  /// Locks landscape (or allows portrait for the Trackpad), enables immersive mode, keeps screen awake.
+  Future<void> _applyOrientationForStyle() {
+    return SystemChrome.setPreferredOrientations(
+      _style == GamepadStyle.pcTrackpad
+          ? const [
+              DeviceOrientation.portraitUp,
+              DeviceOrientation.landscapeLeft,
+              DeviceOrientation.landscapeRight,
+            ]
+          : const [
+              DeviceOrientation.landscapeLeft,
+              DeviceOrientation.landscapeRight,
+            ],
+    );
+  }
+
   Future<void> _enterGamepadMode() async {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    await _applyOrientationForStyle();
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     await WakelockPlus.enable();
   }
@@ -99,6 +115,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
       _deadzone = appearance.deadzone;
       _hudOpacity = appearance.hudOpacity;
     });
+    _applyOrientationForStyle();
   }
 
   /// Persists all current appearance & control settings.
@@ -138,6 +155,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
     setState(() {
       _style = nextStyle;
     });
+    _applyOrientationForStyle();
     _saveAppearancePrefs();
   }
 
@@ -252,8 +270,8 @@ class _GamepadScreenState extends State<GamepadScreen> {
 
   /// Returns status badge color and short text for the top status pill.
   GamepadStatusBadge _statusMeta(GamepadTheme theme) {
-    final prefix = _style.shortLabel;
-    final gyroSuffix = _gyroEnabled ? ' • GYRO' : '';
+    final prefix = _style.statusPrefix;
+    final gyroSuffix = (!_style.isPcSuite && _gyroEnabled) ? ' • GYRO' : '';
     switch (_connectionStatus) {
       case ConnectionStatus.connected:
         return (color: theme.statusAccent, label: '$prefix • LIVE$gyroSuffix');
@@ -279,8 +297,16 @@ class _GamepadScreenState extends State<GamepadScreen> {
     super.dispose();
   }
 
-  /// Builds the active layout screen widget (PlayStation, Xbox, or Switch Pro).
+  /// Builds the active layout screen widget (PlayStation, Xbox, Switch Pro, or PC Suite).
   Widget _buildActiveGamepad(GamepadTheme theme, GamepadStatusBadge status) {
+    final pcConfig = PcSuiteScreenConfig(
+      theme: theme,
+      hudOpacity: _hudOpacity,
+      status: status,
+      onOpenMenu: _openQuickMenu,
+      onSwitchStyle: _setStyle,
+    );
+
     return switch (_style) {
       GamepadStyle.playstation => PlayStationGamepadScreen(
           theme: theme,
@@ -317,6 +343,37 @@ class _GamepadScreenState extends State<GamepadScreen> {
           getInput: () => _input,
           onInputChanged: _updateInput,
           onOpenMenu: _openQuickMenu,
+        ),
+      GamepadStyle.pcTrackpad => PcTrackpadScreen(
+          config: pcConfig,
+          onMouseMove: _connectionService.sendMouseMove,
+          onMouseButton: _connectionService.sendMouseButton,
+          onMouseScroll: _connectionService.sendMouseScroll,
+          onShortcut: _connectionService.sendShortcut,
+          onTapKey: (key) {
+            _connectionService.sendKeyEvent(key, true);
+            _connectionService.sendKeyEvent(key, false);
+          },
+        ),
+      GamepadStyle.pcKeyboardWin ||
+      GamepadStyle.pcKeyboardMac =>
+        PcKeyboardScreen(
+          config: pcConfig,
+          isMac: _style == GamepadStyle.pcKeyboardMac,
+          onKeyEvent: (key, pressed, modifiers) =>
+              _connectionService.sendKeyEvent(
+            key,
+            pressed,
+            modifiers: modifiers,
+          ),
+          onShortcut: _connectionService.sendShortcut,
+        ),
+      GamepadStyle.hybridWasdTrackpad => HybridWasdTrackpadScreen(
+          config: pcConfig,
+          onKeyChanged: _connectionService.sendKeyEvent,
+          onMouseMove: _connectionService.sendMouseMove,
+          onMouseButton: _connectionService.sendMouseButton,
+          onMouseScroll: _connectionService.sendMouseScroll,
         ),
     };
   }
@@ -368,7 +425,7 @@ class _GamepadScreenState extends State<GamepadScreen> {
                                 : tokens.chipIdleText,
                             side: BorderSide(
                               color: preset == _buttonSize
-                                  ? tokens.chipActiveFill
+                                  ? tokens.chipActiveBorder
                                   : tokens.chipIdleBorder,
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 10),

@@ -26,11 +26,57 @@ class GamepadRadii {
   const GamepadRadii._();
 }
 
-/// Controller layout preset supported by the gamepad UI.
+/// Controller & PC input layout preset supported by the app.
 enum GamepadStyle {
-  playstation(displayName: 'PlayStation', shortLabel: 'PS5'),
-  xbox(displayName: 'Xbox', shortLabel: 'XBOX'),
-  nintendoSwitch(displayName: 'Switch Pro', shortLabel: 'SWITCH');
+  playstation(
+    displayName: 'PlayStation',
+    shortLabel: 'PS5',
+    statusPrefix: 'PS5',
+    drawerLabel: 'PS5',
+    isPcSuite: false,
+  ),
+  xbox(
+    displayName: 'Xbox',
+    shortLabel: 'XBOX',
+    statusPrefix: 'XBOX',
+    drawerLabel: 'Xbox',
+    isPcSuite: false,
+  ),
+  nintendoSwitch(
+    displayName: 'Switch Pro',
+    shortLabel: 'SWITCH',
+    statusPrefix: 'SWITCH',
+    drawerLabel: 'Switch',
+    isPcSuite: false,
+  ),
+  pcTrackpad(
+    displayName: 'Trackpad & Mouse',
+    shortLabel: 'TRACKPAD',
+    statusPrefix: 'TRACKPAD • PC REMOTE',
+    drawerLabel: 'Trackpad',
+    isPcSuite: true,
+  ),
+  pcKeyboardWin(
+    displayName: 'PC Keyboard (Win)',
+    shortLabel: 'WIN KB',
+    statusPrefix: 'KEYBOARD • US QWERTY',
+    drawerLabel: 'Win KB',
+    isPcSuite: true,
+  ),
+  pcKeyboardMac(
+    displayName: 'macOS Keyboard',
+    shortLabel: 'MAC KB',
+    statusPrefix: 'KEYBOARD • macOS QWERTY',
+    drawerLabel: 'macOS KB',
+    isPcSuite: true,
+  ),
+  hybridWasdTrackpad(
+    displayName: 'Hybrid WASD + Pad',
+    shortLabel: 'HYBRID',
+    statusPrefix: 'HYBRID • WASD + TRACKPAD',
+    drawerLabel: 'Hybrid WASD',
+    isPcSuite: true,
+  );
 
   /// Human-readable preset name shown in menus and pickers.
   final String displayName;
@@ -38,9 +84,24 @@ enum GamepadStyle {
   /// Compact badge label shown on the status bar.
   final String shortLabel;
 
+  /// Full status pill prefix shown on the active controller/PC screen.
+  final String statusPrefix;
+
+  /// Compact chip label shown inside QuickMenuDrawer.
+  final String drawerLabel;
+
+  /// Whether this preset belongs to the Trackpad, Mouse & Keyboard Suite.
+  final bool isPcSuite;
+
+  /// Whether this preset is a console gamepad layout.
+  bool get isConsole => !isPcSuite;
+
   const GamepadStyle({
     required this.displayName,
     required this.shortLabel,
+    required this.statusPrefix,
+    required this.drawerLabel,
+    required this.isPcSuite,
   });
 }
 
@@ -342,10 +403,20 @@ class GamepadTheme {
       (GamepadStyle.xbox, true) => xboxDark,
       (GamepadStyle.nintendoSwitch, false) => nintendoSwitchLight,
       (GamepadStyle.nintendoSwitch, true) => nintendoSwitchDark,
+      (GamepadStyle.pcTrackpad, false) ||
+      (GamepadStyle.pcKeyboardWin, false) ||
+      (GamepadStyle.pcKeyboardMac, false) ||
+      (GamepadStyle.hybridWasdTrackpad, false) =>
+        pcSuiteLight,
+      (GamepadStyle.pcTrackpad, true) ||
+      (GamepadStyle.pcKeyboardWin, true) ||
+      (GamepadStyle.pcKeyboardMac, true) ||
+      (GamepadStyle.hybridWasdTrackpad, true) =>
+        pcSuiteDark,
     };
   }
 
-  /// PlayStation DualSense — Light Mode palette.
+  /// PlayStation DualSense - Light Mode palette.
   static const GamepadTheme playstationLight = GamepadTheme(
     style: GamepadStyle.playstation,
     isDark: false,
@@ -410,7 +481,7 @@ class GamepadTheme {
     macroRightText: Color(0xFF005BB0),
   );
 
-  /// PlayStation DualSense — Dark Mode palette.
+  /// PlayStation DualSense - Dark Mode palette.
   static const GamepadTheme playstationDark = GamepadTheme(
     style: GamepadStyle.playstation,
     isDark: true,
@@ -475,7 +546,7 @@ class GamepadTheme {
     macroRightText: Color(0xFF60B4FF),
   );
 
-  /// Xbox Series — Light Mode (Robot White) palette.
+  /// Xbox Series - Light Mode (Robot White) palette.
   static const GamepadTheme xboxLight = GamepadTheme(
     style: GamepadStyle.xbox,
     isDark: false,
@@ -542,7 +613,7 @@ class GamepadTheme {
     macroRightText: Color(0xFF0C660C),
   );
 
-  /// Xbox Series — Dark Mode (Carbon Black) palette.
+  /// Xbox Series - Dark Mode (Carbon Black) palette.
   static const GamepadTheme xboxDark = GamepadTheme(
     style: GamepadStyle.xbox,
     isDark: true,
@@ -607,7 +678,7 @@ class GamepadTheme {
     macroRightText: Color(0xFF4ADE80),
   );
 
-  /// Nintendo Switch Pro — Light Mode palette with Joy-Con dual stick accents.
+  /// Nintendo Switch Pro - Light Mode palette with Joy-Con dual stick accents.
   static const GamepadTheme nintendoSwitchLight = GamepadTheme(
     style: GamepadStyle.nintendoSwitch,
     isDark: false,
@@ -680,7 +751,7 @@ class GamepadTheme {
     macroRightText: Color(0xFFCC0010),
   );
 
-  /// Nintendo Switch Pro — Dark Mode palette with Joy-Con dual stick accents.
+  /// Nintendo Switch Pro - Dark Mode palette with Joy-Con dual stick accents.
   static const GamepadTheme nintendoSwitchDark = GamepadTheme(
     style: GamepadStyle.nintendoSwitch,
     isDark: true,
@@ -751,5 +822,131 @@ class GamepadTheme {
     macroRightFill: Color(0xFF261419),
     macroRightBorder: Color(0xFFFF3C28),
     macroRightText: Color(0xFFFB7185),
+  );
+
+  /// PC Trackpad, Mouse & Keyboard Suite - Light Mode (Silver & Amber) palette.
+  static const GamepadTheme pcSuiteLight = GamepadTheme(
+    style: GamepadStyle.pcTrackpad,
+    isDark: false,
+    chassisBg: Color(0xFFFFFFFF),
+    buttonFill: Color(0xFFEEF1F6),
+    buttonBorder: Color(0xFFC0C0C0),
+    buttonPressedFill: Color(0xFFDCE3F0),
+    plateFill: Color(0xFFF1F4FA),
+    plateBorder: Color(0xFFC0C0C0),
+    dpadCapFill: Color(0xFFFFFFFF),
+    dpadCapBorder: Color(0xFFC0C0C0),
+    dpadArrowColor: Color(0xFF001F3F),
+    faceCapFill: Color(0xFFFFFFFF),
+    faceCapBorder: Color(0xFFC0C0C0),
+    stickSocketFill: Color(0xFFF1F4FA),
+    stickSocketBorder: Color(0xFFC0C0C0),
+    stickCapFill: Color(0xFFFFFFFF),
+    stickCapBorder: Color(0xFFC0C0C0),
+    stickIndentFill: Color(0xFFEEF1F6),
+    stickIndentBorder: Color(0xFFF59E0B),
+    stickIndentBorderWidth: 1.5,
+    touchpadFill: Color(0xFFF1F4FA),
+    touchpadBorder: Color(0xFFC0C0C0),
+    touchpadLightbar: Color(0xFFF59E0B),
+    touchpadLabel: Color(0xFF64748B),
+    textPrimary: Color(0xFF001F3F),
+    textSecondary: Color(0xFF475569),
+    textMuted: Color(0xFF64748B),
+    actionTop: GamepadActionToken(
+      label: 'Y',
+      accentColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFB45309),
+      borderWidth: 1.5,
+    ),
+    actionRight: GamepadActionToken(
+      label: 'B',
+      accentColor: Color(0xFFEA580C),
+      borderWidth: 1.5,
+    ),
+    actionBottom: GamepadActionToken(
+      label: 'A',
+      accentColor: Color(0xFF001F3F),
+      borderWidth: 1.5,
+    ),
+    actionLeft: GamepadActionToken(
+      label: 'X',
+      accentColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFB45309),
+      borderWidth: 1.5,
+    ),
+    homeFill: Color(0xFFFFFBEB),
+    homeBorder: Color(0xFFF59E0B),
+    homeIcon: Color(0xFFB45309),
+    muteLed: Color(0xFFF59E0B),
+    statusAccent: Color(0xFFB45309),
+    onStatusAccent: Color(0xFFFFFFFF),
+    statusBadgeFill: Color(0xFFEEF1F6),
+    statusBadgeBorder: Color(0xFFC0C0C0),
+    gripTrimColor: Color(0xFFD2D8E4),
+    disconnectColor: Color(0xFFEA580C),
+  );
+
+  /// PC Trackpad, Mouse & Keyboard Suite - Dark Mode (Midnight Navy & Gold) palette.
+  static const GamepadTheme pcSuiteDark = GamepadTheme(
+    style: GamepadStyle.pcTrackpad,
+    isDark: true,
+    chassisBg: Color(0xFF0A1628),
+    buttonFill: Color(0xFF001F3F),
+    buttonBorder: Color(0xFFC0C0C0),
+    buttonPressedFill: Color(0xFF0A315B),
+    plateFill: Color(0xFF001F3F),
+    plateBorder: Color(0xFFC0C0C0),
+    dpadCapFill: Color(0xFF001F3F),
+    dpadCapBorder: Color(0xFFC0C0C0),
+    dpadArrowColor: Color(0xFFFFD700),
+    faceCapFill: Color(0xFF001F3F),
+    faceCapBorder: Color(0xFFC0C0C0),
+    stickSocketFill: Color(0xFF0A1628),
+    stickSocketBorder: Color(0xFFC0C0C0),
+    stickCapFill: Color(0xFF001F3F),
+    stickCapBorder: Color(0xFFF59E0B),
+    stickIndentFill: Color(0xFF0A1628),
+    stickIndentBorder: Color(0xFFF59E0B),
+    stickIndentBorderWidth: 1.5,
+    touchpadFill: Color(0xFF001F3F),
+    touchpadBorder: Color(0xFFC0C0C0),
+    touchpadLightbar: Color(0xFFF59E0B),
+    touchpadLabel: Color(0xFFC0C0C0),
+    textPrimary: Color(0xFFC0C0C0),
+    textSecondary: Color(0xFFC0C0C0),
+    textMuted: Color(0xFFC0C0C0),
+    actionTop: GamepadActionToken(
+      label: 'Y',
+      accentColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFFFD700),
+      borderWidth: 1.5,
+    ),
+    actionRight: GamepadActionToken(
+      label: 'B',
+      accentColor: Color(0xFFEA580C),
+      borderWidth: 1.5,
+    ),
+    actionBottom: GamepadActionToken(
+      label: 'A',
+      accentColor: Color(0xFFF59E0B),
+      textColor: Color(0xFFFFD700),
+      borderWidth: 1.5,
+    ),
+    actionLeft: GamepadActionToken(
+      label: 'X',
+      accentColor: Color(0xFFC0C0C0),
+      borderWidth: 1.5,
+    ),
+    homeFill: Color(0xFF001F3F),
+    homeBorder: Color(0xFFF59E0B),
+    homeIcon: Color(0xFFFFD700),
+    muteLed: Color(0xFFF59E0B),
+    statusAccent: Color(0xFFF59E0B),
+    onStatusAccent: Color(0xFF0A1628),
+    statusBadgeFill: Color(0xFF001F3F),
+    statusBadgeBorder: Color(0xFFF59E0B),
+    gripTrimColor: Color(0xFF1E3A5F),
+    disconnectColor: Color(0xFFEA580C),
   );
 }

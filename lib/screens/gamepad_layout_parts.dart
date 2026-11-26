@@ -41,18 +41,26 @@ Widget centeredGamepadControl({
   );
 }
 
-/// Responsive landscape canvas that applies symmetric notch-safe horizontal
-/// padding, proportional `852 x 393` artboard scaling, live HUD opacity, and bottom grip trims.
-class GamepadCanvasShell extends StatelessWidget {
-  final GamepadTheme theme;
+/// Neutral proportional artboard canvas using `LayoutBuilder`, `SafeArea`,
+/// and optional symmetric notch-safe horizontal padding.
+class ArtboardCanvasShell extends StatelessWidget {
+  final double artboardWidth;
+  final double artboardHeight;
+  final Color backgroundColor;
+  final bool isDark;
   final double hudOpacity;
+  final bool symmetricNotchPadding;
   final List<Widget> Function(GamepadScale s) builder;
 
-  const GamepadCanvasShell({
+  const ArtboardCanvasShell({
     super.key,
-    required this.theme,
+    required this.artboardWidth,
+    required this.artboardHeight,
+    required this.backgroundColor,
+    required this.isDark,
     required this.builder,
     this.hudOpacity = 1.0,
+    this.symmetricNotchPadding = false,
   });
 
   @override
@@ -67,27 +75,27 @@ class GamepadCanvasShell extends StatelessWidget {
       viewPadding.top,
       mediaPadding.top,
     ].reduce(math.max);
-    final horizontalSafePadding = math.max(notchOrStatusBar + 16.0, 48.0);
+    final horizontalSafePadding = symmetricNotchPadding
+        ? math.max(notchOrStatusBar + 16.0, 48.0)
+        : 0.0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: theme.isDark
-          ? SystemUiOverlayStyle.light
-          : SystemUiOverlayStyle.dark,
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: theme.chassisBg,
+        backgroundColor: backgroundColor,
         body: SafeArea(
-          left: false,
-          right: false,
+          left: !symmetricNotchPadding,
+          right: !symmetricNotchPadding,
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalSafePadding),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final scale = math.min(
-                  constraints.maxWidth / kGamepadArtboardWidth,
-                  constraints.maxHeight / kGamepadArtboardHeight,
+                  constraints.maxWidth / artboardWidth,
+                  constraints.maxHeight / artboardHeight,
                 );
-                final boardW = kGamepadArtboardWidth * scale;
-                final boardH = kGamepadArtboardHeight * scale;
+                final boardW = artboardWidth * scale;
+                final boardH = artboardHeight * scale;
                 double s(double v) => v * scale;
 
                 return Center(
@@ -98,35 +106,7 @@ class GamepadCanvasShell extends StatelessWidget {
                       height: boardH,
                       child: Stack(
                         clipBehavior: Clip.none,
-                        children: [
-                          ...builder(s),
-
-                          // Bottom ergonomic grip trim bars (140x6, radius 3).
-                          Positioned(
-                            left: s(40),
-                            bottom: s(6),
-                            child: Container(
-                              width: s(140),
-                              height: s(6),
-                              decoration: BoxDecoration(
-                                color: theme.gripTrimColor,
-                                borderRadius: BorderRadius.circular(s(3)),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: s(40),
-                            bottom: s(6),
-                            child: Container(
-                              width: s(140),
-                              height: s(6),
-                              decoration: BoxDecoration(
-                                color: theme.gripTrimColor,
-                                borderRadius: BorderRadius.circular(s(3)),
-                              ),
-                            ),
-                          ),
-                        ],
+                        children: builder(s),
                       ),
                     ),
                   ),
@@ -136,6 +116,62 @@ class GamepadCanvasShell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Responsive landscape canvas for console gamepads (`852 x 393` artboard)
+/// with symmetric notch-safe padding and bottom ergonomic grip trims.
+class GamepadCanvasShell extends StatelessWidget {
+  final GamepadTheme theme;
+  final double hudOpacity;
+  final List<Widget> Function(GamepadScale s) builder;
+
+  const GamepadCanvasShell({
+    super.key,
+    required this.theme,
+    required this.builder,
+    this.hudOpacity = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ArtboardCanvasShell(
+      artboardWidth: kGamepadArtboardWidth,
+      artboardHeight: kGamepadArtboardHeight,
+      backgroundColor: theme.chassisBg,
+      isDark: theme.isDark,
+      hudOpacity: hudOpacity,
+      symmetricNotchPadding: true,
+      builder: (s) => [
+        ...builder(s),
+
+        // Bottom ergonomic grip trim bars (140x6, radius 3).
+        Positioned(
+          left: s(40),
+          bottom: s(6),
+          child: Container(
+            width: s(140),
+            height: s(6),
+            decoration: BoxDecoration(
+              color: theme.gripTrimColor,
+              borderRadius: BorderRadius.circular(s(3)),
+            ),
+          ),
+        ),
+        Positioned(
+          right: s(40),
+          bottom: s(6),
+          child: Container(
+            width: s(140),
+            height: s(6),
+            decoration: BoxDecoration(
+              color: theme.gripTrimColor,
+              borderRadius: BorderRadius.circular(s(3)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -487,7 +523,7 @@ class _GamepadHomeButtonState extends State<GamepadHomeButton> {
                         size: widget.size * 0.52,
                         color: theme.homeIcon,
                       ),
-                    GamepadStyle.playstation => Text(
+                    GamepadStyle.playstation || _ => Text(
                         'PS',
                         style: TextStyle(
                           color: theme.homeIcon,

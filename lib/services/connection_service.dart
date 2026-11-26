@@ -6,6 +6,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../models/gamepad_input.dart';
 
+/// Physical mouse button identifiers sent over the WebSocket protocol.
+enum MouseButton { left, middle, right }
+
 /// Status koneksi WebSocket ke server PC Windows.
 enum ConnectionStatus {
   connected,
@@ -131,13 +134,68 @@ class ConnectionService {
 
   /// Mengirim state [GamepadInput] sebagai JSON; mengabaikan error jika terputus.
   void sendInput(GamepadInput input) {
+    _sendJson(input.toJson());
+  }
+
+  /// Mengirim delta pergerakan mouse relatif dari trackpad.
+  void sendMouseMove(double dx, double dy) {
+    if (dx == 0.0 && dy == 0.0) return;
+    _sendJson({
+      'type': 'mouse_move',
+      'dx': (dx * 100).round() / 100.0,
+      'dy': (dy * 100).round() / 100.0,
+    });
+  }
+
+  /// Mengirim event tekan/lepas tombol mouse ([MouseButton]).
+  void sendMouseButton(MouseButton button, bool pressed) {
+    _sendJson({
+      'type': 'mouse_button',
+      'button': button.name,
+      'pressed': pressed,
+    });
+  }
+
+  /// Mengirim event scroll wheel vertikal/horizontal dari trackpad.
+  void sendMouseScroll(double dx, double dy) {
+    if (dx == 0.0 && dy == 0.0) return;
+    _sendJson({
+      'type': 'mouse_scroll',
+      'dx': (dx * 100).round() / 100.0,
+      'dy': (dy * 100).round() / 100.0,
+    });
+  }
+
+  /// Mengirim event keyboard tekan/lepas beserta modifier aktif.
+  void sendKeyEvent(
+    String key,
+    bool pressed, {
+    Set<String> modifiers = const {},
+  }) {
+    _sendJson({
+      'type': 'key',
+      'key': key,
+      'pressed': pressed,
+      if (modifiers.isNotEmpty) 'modifiers': modifiers.toList(),
+    });
+  }
+
+  /// Mengirim kombinasi shortcut keyboard sekaligus (mis. `Ctrl+C`, `Cmd+Space`).
+  void sendShortcut(List<String> keys) {
+    if (keys.isEmpty) return;
+    _sendJson({
+      'type': 'shortcut',
+      'keys': keys,
+    });
+  }
+
+  void _sendJson(Map<String, dynamic> payload) {
     if (_status != ConnectionStatus.connected || _channel == null) {
       return;
     }
 
     try {
-      final payload = jsonEncode(input.toJson());
-      _channel!.sink.add(payload);
+      _channel!.sink.add(jsonEncode(payload));
     } catch (_) {
       // Abaikan error pengiriman saat koneksi sedang terputus atau tertutup.
     }

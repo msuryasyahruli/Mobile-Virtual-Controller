@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vcontrollers/main.dart';
 import 'package:vcontrollers/screens/connect_screen.dart';
 import 'package:vcontrollers/screens/gamepad_screen.dart';
+import 'package:vcontrollers/screens/pc_keyboard_screen.dart';
+import 'package:vcontrollers/theme/gamepad_theme.dart';
+import 'package:vcontrollers/widgets/pc_suite_parts.dart';
 
 void main() {
   testWidgets(
@@ -67,7 +70,8 @@ void main() {
             key: ValueKey('gamepad_$viewport'),
             routes: {
               '/': (_) => const ConnectScreen(),
-              '/gamepad': (_) => GamepadScreen(key: ValueKey('screen_$viewport')),
+              '/gamepad': (_) =>
+                  GamepadScreen(key: ValueKey('screen_$viewport')),
             },
             initialRoute: '/gamepad',
           ),
@@ -176,6 +180,221 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Connect to PC'), findsOneWidget);
       }
+
+      tester.view.reset();
+    },
+  );
+
+  testWidgets(
+    'Trackpad, Mouse & Keyboard Suite (4 modes) renders cleanly in Dark & Light modes with zero overflow and working mode switches',
+    (tester) async {
+      for (final viewport in const [
+        Size(667, 375),
+        Size(852, 393),
+        Size(932, 430),
+      ]) {
+        SharedPreferences.setMockInitialValues({});
+        tester.view.physicalSize = viewport;
+        tester.view.devicePixelRatio = 1.0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey('suite_$viewport'),
+            routes: {
+              '/': (_) => const ConnectScreen(),
+              '/gamepad': (_) =>
+                  GamepadScreen(key: ValueKey('suite_gp_$viewport')),
+            },
+            initialRoute: '/gamepad',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Open Quick Menu Drawer and select Trackpad
+        await tester.tap(find.text('☰'));
+        await tester.pumpAndSettle();
+        expect(find.text('PC INPUT & KEYBOARD SUITE'), findsOneWidget);
+        await tester.tap(find.text('Trackpad'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.close_rounded));
+        await tester.pumpAndSettle();
+
+        // Verify Mode 1: PC Trackpad & Mouse
+        expect(find.text('LEFT CLICK (LMB)'), findsOneWidget);
+        expect(find.text('MID'), findsOneWidget);
+        expect(find.text('RIGHT CLICK (RMB)'), findsOneWidget);
+        expect(find.text('SCROLL'), findsNothing);
+        expect(find.text('DPI 1.2x'), findsOneWidget);
+
+        // Cycle DPI
+        await tester.tap(find.text('DPI 1.2x'));
+        await tester.pumpAndSettle();
+        expect(find.text('DPI 1.5x'), findsOneWidget);
+
+        // Switch via top-bar KEYBOARD button -> Mode 2: Windows Mechanical Keyboard
+        await tester.tap(find.text('KEYBOARD'));
+        await tester.pumpAndSettle();
+        expect(find.text('⌫ BKSP'), findsOneWidget);
+        expect(find.text('↵ ENTER'), findsOneWidget);
+        expect(find.text('TASK MGR'), findsOneWidget);
+
+        // Toggle FN -> F1..F12 overlay
+        await tester.tap(find.text('FN'));
+        await tester.pumpAndSettle();
+        expect(find.text('F1'), findsOneWidget);
+        expect(find.text('F12'), findsOneWidget);
+
+        // Switch OS via top-bar Win / macOS toggle -> Mode 3: macOS Keyboard
+        await tester.tap(find.text('Win / macOS'));
+        await tester.pumpAndSettle();
+        expect(find.text('⌫ DELETE'), findsOneWidget);
+        expect(find.text('⏎ RETURN'), findsOneWidget);
+        expect(find.text('MISSION CTRL'), findsOneWidget);
+        expect(find.text('⌘ CMD'), findsNWidgets(2));
+
+        // Open Quick Menu -> switch to Light Mode and Hybrid WASD
+        await tester.tap(find.text('☰'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('DARK MODE'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Hybrid WASD'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.close_rounded));
+        await tester.pumpAndSettle();
+
+        // Verify Mode 4: Hybrid Gaming (WASD + Mouse Trackpad) in Light Mode
+        expect(find.text('SHIFT (SPRINT)'), findsOneWidget);
+        expect(find.text('CTRL (CROUCH)'), findsOneWidget);
+        expect(find.text('SPACE (JUMP)'), findsOneWidget);
+        expect(find.text('LMB (FIRE / CLICK)'), findsOneWidget);
+        expect(find.text('RMB (ADS / MENU)'), findsOneWidget);
+
+        // Switch back to Full KB via top-bar FULL KB button
+        await tester.tap(find.text('FULL KB'));
+        await tester.pumpAndSettle();
+        expect(find.text('↵ ENTER'), findsOneWidget);
+      }
+
+      tester.view.reset();
+    },
+  );
+
+  testWidgets(
+    'Trackpad supports Portrait & Landscape in Light & Dark themes without overflow and gestures reach callbacks',
+    (tester) async {
+      for (final isDark in const [true, false]) {
+        for (final viewport in const [
+          Size(393, 852),
+          Size(360, 780),
+          Size(852, 393),
+          Size(667, 375),
+        ]) {
+          SharedPreferences.setMockInitialValues(
+              {'vcontrollers_ui_dark': isDark});
+          tester.view.physicalSize = viewport;
+          tester.view.devicePixelRatio = 1.0;
+
+          await tester.pumpWidget(
+            MaterialApp(
+              key: ValueKey('tp_${isDark}_$viewport'),
+              routes: {
+                '/': (_) => const ConnectScreen(),
+                '/gamepad': (_) => GamepadScreen(
+                      key: ValueKey('tp_gp_${isDark}_$viewport'),
+                      initialStyle: GamepadStyle.pcTrackpad,
+                    ),
+              },
+              initialRoute: '/gamepad',
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final portrait = viewport.height > viewport.width;
+          expect(find.text('MID'), findsOneWidget);
+          expect(find.text('SCROLL'), findsNothing);
+          expect(find.text('DPI 1.2x'), findsOneWidget);
+          expect(find.text('KEYBOARD'), findsOneWidget);
+          expect(find.text(portrait ? 'LMB (LEFT)' : 'LEFT CLICK (LMB)'),
+              findsOneWidget);
+          expect(find.text('◀ BACK'), portrait ? findsOneWidget : findsNothing);
+          expect(
+              find.text('WIN / ⌘'), portrait ? findsOneWidget : findsNothing);
+          expect(find.text('FWD ▶'), portrait ? findsOneWidget : findsNothing);
+
+          // Two-finger drag on trackpad must not throw.
+          final pad = find.byType(PcMultiTouchTrackpad);
+          expect(pad, findsOneWidget);
+          final c = tester.getCenter(pad);
+          final g1 = await tester.startGesture(c + const Offset(-10, 0));
+          final g2 = await tester.startGesture(c + const Offset(10, 0));
+          await g1.moveBy(const Offset(0, 20));
+          await g2.moveBy(const Offset(0, 20));
+          await g1.up();
+          await g2.up();
+          await tester.pumpAndSettle();
+        }
+      }
+
+      tester.view.reset();
+    },
+  );
+
+  testWidgets(
+    'PcKeyboardScreen repeat keys do not double-send and sticky modifiers latch cleanly',
+    (tester) async {
+      final events = <(String, bool, Set<String>)>[];
+      tester.view.physicalSize = const Size(852, 393);
+      tester.view.devicePixelRatio = 1.0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PcKeyboardScreen(
+            config: PcSuiteScreenConfig(
+              theme: GamepadTheme.playstationDark,
+              hudOpacity: 1.0,
+              status: (color: const Color(0xFF22C55E), label: 'KEYBOARD • LIVE'),
+              onOpenMenu: () {},
+              onSwitchStyle: (_) {},
+            ),
+            isMac: false,
+            onKeyEvent: (key, pressed, mods) =>
+                events.add((key, pressed, Set<String>.from(mods))),
+            onShortcut: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Quick tap on SPACE (enableRepeat: true) must emit exactly 1 down + 1 up.
+      await tester.tap(find.text('SPACE'));
+      await tester.pumpAndSettle();
+      expect(events.where((e) => e.$1 == 'SPACE').length, 2);
+      expect(events.first.$2, isTrue);
+      expect(events.last.$2, isFalse);
+
+      events.clear();
+
+      // Quick tap on SHIFT latches it ON without emitting pressed: false.
+      await tester.tap(find.text('⇧ SHIFT'));
+      await tester.pumpAndSettle();
+      expect(events.length, 1);
+      expect(events.first.$1, 'SHIFT');
+      expect(events.first.$2, isTrue);
+      expect(events.first.$3, {'SHIFT'});
+      expect(find.text('A'), findsOneWidget);
+
+      events.clear();
+
+      // Tapping 'A' sends 'A' with SHIFT modifier, then auto-releases SHIFT.
+      await tester.tap(find.text('A'));
+      await tester.pumpAndSettle();
+      expect(events.length, 3);
+      expect((events[0].$1, events[0].$2), ('A', true));
+      expect(events[0].$3, {'SHIFT'});
+      expect((events[1].$1, events[1].$2), ('A', false));
+      expect(events[1].$3, {'SHIFT'});
+      expect((events[2].$1, events[2].$2), ('SHIFT', false));
+      expect(events[2].$3, isEmpty);
 
       tester.view.reset();
     },

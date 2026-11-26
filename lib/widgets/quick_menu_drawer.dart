@@ -26,6 +26,7 @@ class QuickMenuTokens {
   final Color chipIdleBorder;
   final Color chipIdleText;
   final Color chipActiveFill;
+  final Color chipActiveBorder;
   final Color chipActiveText;
 
   final Color openWorldBorder;
@@ -71,6 +72,7 @@ class QuickMenuTokens {
     required this.chipIdleBorder,
     required this.chipIdleText,
     required this.chipActiveFill,
+    required this.chipActiveBorder,
     required this.chipActiveText,
     required this.openWorldBorder,
     required this.openWorldText,
@@ -114,6 +116,7 @@ class QuickMenuTokens {
     chipIdleBorder: Color(0xFFC0C0C0),
     chipIdleText: Color(0xFFC0C0C0),
     chipActiveFill: Color(0xFFF59E0B),
+    chipActiveBorder: Color(0xFFEA580C),
     chipActiveText: Color(0xFF0A1628),
     openWorldBorder: Color(0xFFF59E0B),
     openWorldText: Color(0xFFFFD700),
@@ -134,9 +137,9 @@ class QuickMenuTokens {
     sliderLabel: Color(0xFFC0C0C0),
     editHudFill: Color(0xFF001F3F),
     editHudBorder: Color(0xFFEA580C),
-    editHudText: Color(0xFFFFD700),
+    editHudText: Color(0xFFEA580C),
     pairingFill: Color(0xFFF59E0B),
-    pairingBorder: Color(0xFFFFD700),
+    pairingBorder: Color(0xFFEA580C),
     pairingText: Color(0xFF0A1628),
   );
 
@@ -147,17 +150,18 @@ class QuickMenuTokens {
     surface: Color(0xFFFFFFFF),
     leftBorder: Color(0xFFD2D8E4),
     headerTitle: Color(0xFF1E293B),
-    pingFill: Color(0xFF001F3F),
+    pingFill: Color(0xFFFFFBEB),
     pingBorder: Color(0xFFF59E0B),
-    pingText: Color(0xFFFFD700),
+    pingText: Color(0xFFB45309),
     closeFill: Color(0xFFF1F4FA),
     closeIcon: Color(0xFF475569),
     categoryLabel: Color(0xFF475569),
     chipIdleFill: Color(0xFFF1F4FA),
     chipIdleBorder: Color(0xFFD5DBE8),
     chipIdleText: Color(0xFF475569),
-    chipActiveFill: Color(0xFF001F3F),
-    chipActiveText: Color(0xFFFFD700),
+    chipActiveFill: Color(0xFFF59E0B),
+    chipActiveBorder: Color(0xFFEA580C),
+    chipActiveText: Color(0xFF0A1628),
     openWorldBorder: Color(0xFFF59E0B),
     openWorldText: Color(0xFFB45309),
     fpsBorder: Color(0xFFEA580C),
@@ -172,12 +176,12 @@ class QuickMenuTokens {
     sliderCardFill: Color(0xFFF1F4FA),
     sliderCardBorder: Color(0xFFD5DBE8),
     sliderTrack: Color(0xFFCBD2E0),
-    deadzoneFill: Color(0xFF001F3F),
+    deadzoneFill: Color(0xFFB45309),
     opacityFill: Color(0xFFF59E0B),
     sliderLabel: Color(0xFF475569),
-    editHudFill: Color(0xFF001F3F),
+    editHudFill: Color(0xFFFFF7ED),
     editHudBorder: Color(0xFFEA580C),
-    editHudText: Color(0xFFFFD700),
+    editHudText: Color(0xFFEA580C),
     pairingFill: Color(0xFFF59E0B),
     pairingBorder: Color(0xFFEA580C),
     pairingText: Color(0xFF0A1628),
@@ -402,6 +406,15 @@ class _QuickMenuDrawerState extends State<QuickMenuDrawer>
                                       _buildConsolesRow(tokens),
                                       const SizedBox(height: 10),
 
+                                      // 2b. PC Input & Keyboard Suite
+                                      _buildCategoryTitle(
+                                        'PC INPUT & KEYBOARD SUITE',
+                                        tokens,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildPcSuiteRow(tokens),
+                                      const SizedBox(height: 10),
+
                                       // 3. Category 2: SIMULATORS (2x3 grid, coming soon)
                                       _buildCategoryTitle(
                                         'SIMULATORS (COMING SOON)',
@@ -600,6 +613,26 @@ class _QuickMenuDrawerState extends State<QuickMenuDrawer>
             onTap: null,
           ),
         ),
+      ],
+    );
+  }
+
+  /// Section 2b: Horizontal row of active Trackpad, Mouse & Keyboard Suite presets.
+  Widget _buildPcSuiteRow(QuickMenuTokens tokens) {
+    final suiteStyles = GamepadStyle.values.where((s) => s.isPcSuite).toList();
+    return Row(
+      children: [
+        for (var i = 0; i < suiteStyles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Expanded(
+            child: _PresetChip(
+              label: suiteStyles[i].drawerLabel,
+              tokens: tokens,
+              isActive: widget.activeStyle == suiteStyles[i],
+              onTap: () => widget.onSelectStyle(suiteStyles[i]),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -877,7 +910,7 @@ class _PresetChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final bgColor = isActive ? tokens.chipActiveFill : tokens.chipIdleFill;
     final borderColor = isActive
-        ? tokens.chipActiveFill
+        ? tokens.chipActiveBorder
         : (borderOverride ?? tokens.chipIdleBorder);
     final textColor = isActive
         ? tokens.chipActiveText

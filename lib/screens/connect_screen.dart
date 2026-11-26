@@ -525,15 +525,18 @@ class _ConnectScreenState extends State<ConnectScreen> {
                               ),
                               const SizedBox(height: 6),
                               Row(
-                                children: GamepadStyle.values.map((preset) {
+                                children: GamepadStyle.values
+                                    .where((s) => s.isConsole)
+                                    .map((preset) {
                                   final selected = preset == _style;
+                                  final isLast = preset ==
+                                      GamepadStyle.values
+                                          .where((s) => s.isConsole)
+                                          .last;
                                   return Expanded(
                                     child: Padding(
                                       padding: EdgeInsets.only(
-                                        right: preset ==
-                                                GamepadStyle.values.last
-                                            ? 0
-                                            : 8,
+                                        right: isLast ? 0 : 8,
                                       ),
                                       child: SizedBox(
                                         height: 44,
@@ -578,6 +581,63 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                     ),
                                   );
                                 }).toList(),
+                              ),
+                              const SizedBox(height: 6),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: GamepadStyle.values
+                                      .where((s) => s.isPcSuite)
+                                      .map((preset) {
+                                    final selected = preset == _style;
+                                    final isLast = preset ==
+                                        GamepadStyle.values
+                                            .where((s) => s.isPcSuite)
+                                            .last;
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        right: isLast ? 0 : 6,
+                                      ),
+                                      child: SizedBox(
+                                        height: 38,
+                                        child: OutlinedButton(
+                                          onPressed: () => _selectStyle(preset),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                            backgroundColor: selected
+                                                ? theme.statusAccent
+                                                    .withValues(alpha: 0.14)
+                                                : theme.buttonFill,
+                                            foregroundColor: selected
+                                                ? theme.statusAccent
+                                                : theme.textPrimary,
+                                            side: BorderSide(
+                                              color: selected
+                                                  ? theme.statusAccent
+                                                  : theme.buttonBorder,
+                                              width: selected ? 1.5 : 1.0,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                GamepadRadii.lg,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            preset.displayName,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                               SizedBox(height: isTight ? 14 : 20),
 
