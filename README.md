@@ -8,10 +8,14 @@ Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubu
   - **PlayStation (DualSense)**: Stick simetris, D-Pad recessed, tombol shapes (`△`, `○`, `✕`, `□`), Touchpad interaktif dengan lightbar, `SHARE`, `OPT`, `L1`/`L2`, `R1`/`R2`, macro `M1`/`M2`, serta tombol khusus `L3`/`R3`.
   - **Xbox Series**: Stick asimetris, Hybrid D-Pad dish, tombol `Y`/`B`/`A`/`X`, `View`, `Menu`, `Share`, `LB`/`LT`, `RB`/`RT`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
   - **Nintendo Switch Pro**: Stick asimetris dengan aksen Joy-Con (Neon Blue/Red), D-Pad, layout fisik Nintendo (`X` atas, `A` kanan, `B` bawah, `Y` kiri), `−`, `+`, Capture (`●`), `ZL`/`L`, `R`/`ZR`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
-- **Quick Menu Drawer (`☰`)**: Slide-over drawer kanan untuk mengganti preset controller, tema **Dark / Light Mode**, **Haptics**, **Gyro**, slider **Deadzone** (`0%` - `25%`), **HUD Opacity** (`20%` - `100%`), masuk **HUD Edit Mode** (`Smaller` / `Normal` / `Larger` + `Reset`), dan kembali ke **PC Pairing**.
-- **True Multi-Touch**: Menggunakan `Listener` per pointer ID sehingga trigger, bumper, kedua analog stick, D-Pad, dan tombol aksi dapat ditekan bersamaan tanpa konflik.
-- **Responsif & Aman Notch**: Skala proporsional berbasis `LayoutBuilder` (artboard referensi `852 × 393`) dengan padding horizontal simetris terhadap notch/status bar.
-- **Orientasi Otomatis**: Portrait di `ConnectScreen`, otomatis lock Landscape + `WakelockPlus` (layar tetap menyala) saat masuk `GamepadScreen`.
+- **Trackpad, Mouse & Keyboard Suite (4 Mode)**:
+  - **Trackpad & Mouse**: Mendukung **Portrait (`393 × 852`)** & **Landscape (`852 × 393`)**, trackpad multi-touch full-width (1-jari gerak kursor dengan DPI `0.8x`–`2.0x`, 1-jari tap `LMB`, 2-jari tap `RMB`, 2-jari drag untuk scroll vertikal/horizontal, double-tap & tahan untuk drag lock), tombol fisik `LMB`/`MID`/`RMB`, `VOL −`/`VOL +`, `MIC`, serta quick nav Portrait (`◀ BACK`, `WIN / ⌘`, `FWD ▶`).
+  - **PC Keyboard (Win)** & **macOS Keyboard**: Keyboard mekanik 65% US QWERTY dengan overlay `FN`/`fn 🌐` (`F1`–`F12`), sticky/holdable modifiers (`SHIFT`, `CTRL`, `ALT`/`OPT`, `WIN`/`⌘ CMD`, `CAPS`), key-repeat `350ms`, shortcut OS (`COPY`, `PASTE`, `UNDO`, `ALT + TAB` / `SPOTLIGHT`, `TASK MGR` / `MISSION CTRL`), serta switch cepat `Win / macOS` dan `TRACKPAD`.
+  - **Hybrid WASD + Pad**: Cluster gaming kiri (`Q`/`W`/`E`/`R`, `A`/`S`/`D`/`F`, `SHIFT (SPRINT)`, `CTRL (CROUCH)`, `SPACE (JUMP)`) yang bekerja bersamaan dengan mouse/aim trackpad + `LMB`/`RMB` di kanan.
+- **Quick Menu Drawer (`☰`)**: Slide-over drawer kanan untuk mengganti preset controller maupun PC Suite, tema **Dark / Light Mode**, **Haptics**, **Gyro**, slider **Deadzone** (`0%` - `25%`), **HUD Opacity** (`20%` - `100%`), masuk **HUD Edit Mode** (`Smaller` / `Normal` / `Larger` + `Reset`), dan kembali ke **PC Pairing**.
+- **True Multi-Touch**: Menggunakan `Listener` per pointer ID sehingga trigger, bumper, kedua analog stick, D-Pad, tombol aksi, maupun WASD + trackpad dapat dipakai bersamaan tanpa konflik.
+- **Responsif & Aman Notch**: Skala proporsional berbasis `LayoutBuilder` (artboard referensi `852 × 393` landscape & `393 × 852` portrait Trackpad) dengan `SafeArea` dan padding simetris terhadap notch/status bar.
+- **Orientasi Otomatis**: Portrait di `ConnectScreen`, Landscape + `WakelockPlus` di `GamepadScreen` (dengan dukungan rotasi Portrait/Landscape khusus mode `Trackpad & Mouse`).
 - **Auto-Reconnect & Hemat Bandwidth**: Otomatis mencoba terhubung ulang setiap 3 detik saat koneksi terputus, dan hanya mengirim payload JSON ketika state input berubah.
 
 ## Struktur Proyek
@@ -25,16 +29,20 @@ flutter-app/
 │   ├── models/
 │   │   └── gamepad_input.dart                  # Model state tombol & axis + toJson()
 │   ├── services/
-│   │   └── connection_service.dart             # WebSocket client, custom port, auto-reconnect, SharedPreferences
+│   │   └── connection_service.dart             # WebSocket client, mouse/keyboard events, auto-reconnect
 │   ├── theme/
-│   │   └── gamepad_theme.dart                  # Token warna PS/Xbox/Switch Pro (Light/Dark), haptics & prefs
+│   │   ├── gamepad_theme.dart                  # Token warna PS/Xbox/Switch Pro/PC Suite (Light/Dark) & prefs
+│   │   └── pc_suite_theme.dart                 # Token warna Midnight Navy/Amber/Silver untuk PC Suite
 │   ├── screens/
 │   │   ├── connect_screen.dart                 # Input IP & Port PC Windows (portrait) + preset & tema
 │   │   ├── gamepad_screen.dart                 # Host screen, Quick Menu Drawer & HUD Edit toolbar
-│   │   ├── gamepad_layout_parts.dart           # Shared canvas shell, top status bar, utility & macro buttons
+│   │   ├── gamepad_layout_parts.dart           # Shared ArtboardCanvasShell, top status bar, utility buttons
 │   │   ├── playstation_gamepad_screen.dart     # Layout PlayStation DualSense
 │   │   ├── xbox_gamepad_screen.dart            # Layout Xbox Series
-│   │   └── switch_pro_gamepad_screen.dart      # Layout Nintendo Switch Pro
+│   │   ├── switch_pro_gamepad_screen.dart      # Layout Nintendo Switch Pro
+│   │   ├── pc_trackpad_screen.dart             # Mode Trackpad & Mouse (Portrait & Landscape)
+│   │   ├── pc_keyboard_screen.dart             # Mode Keyboard 65% US QWERTY (Windows & macOS)
+│   │   └── hybrid_wasd_trackpad_screen.dart    # Mode Hybrid Gaming WASD + Aim Trackpad
 │   └── widgets/
 │       ├── dedicated_stick_click_button.dart   # Tombol pill L3/R3 & LS/RS
 │       ├── gamepad_dpad.dart                   # D-Pad 8-arah / diagonal slide
@@ -42,9 +50,10 @@ flutter-app/
 │       ├── gamepad_shoulder_button.dart        # Tombol L1/L2/R1/R2, LB/LT/RB/RT, ZL/L/R/ZR
 │       ├── gamepad_thumbstick.dart             # Analog stick multi-touch dengan radial deadzone
 │       ├── gamepad_touchpad.dart               # Touchpad DualSense dengan indikator sentuhan
+│       ├── pc_suite_parts.dart                 # Key button repeat, multi-touch trackpad & status pill
 │       └── quick_menu_drawer.dart              # Slide-over Quick Menu Drawer (Dark & Light mode)
 ├── test/
-│   └── widget_test.dart                        # Widget test ConnectScreen, layouts & QuickMenuDrawer
+│   └── widget_test.dart                        # Widget test ConnectScreen, layouts, QuickMenuDrawer & PC Suite
 ├── LICENSE
 └── pubspec.yaml
 ```
@@ -85,6 +94,13 @@ flutter-app/
 ```
 
 > Catatan: Pada layout PlayStation, `✕` dipetakan ke `A`, `○` ke `B`, `□` ke `X`, `△` ke `Y`, `SHARE`/Touchpad ke `SELECT`, dan `OPT` ke `START`. Pada layout Switch Pro, tata letak fisik Nintendo dipetakan sesuai standar (`B` bawah -> `A`, `A` kanan -> `B`, `Y` kiri -> `X`, `X` atas -> `Y`, `−` -> `SELECT`, `+` -> `START`).
+
+- **Format JSON PC Suite (Trackpad, Mouse & Keyboard)**:
+  - `{"type": "mouse_move", "dx": 4.2, "dy": -1.5}`
+  - `{"type": "mouse_button", "button": "left", "pressed": true}` (`left` | `middle` | `right`)
+  - `{"type": "mouse_scroll", "dx": 0.0, "dy": -6.0}`
+  - `{"type": "key", "key": "W", "pressed": true, "modifiers": ["SHIFT"]}`
+  - `{"type": "shortcut", "keys": ["CTRL", "C"]}`
 
 ## Prasyarat
 
