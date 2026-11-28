@@ -191,6 +191,7 @@ class _PcTrackpadScreenState extends State<PcTrackpadScreen> {
         onMouseMove: widget.onMouseMove,
         onMouseButton: widget.onMouseButton,
         onMouseScroll: widget.onMouseScroll,
+        onShortcut: widget.onShortcut,
       ),
     );
   }
@@ -234,7 +235,7 @@ class _PcTrackpadScreenState extends State<PcTrackpadScreen> {
           y: 64,
           w: 780,
           h: 242,
-          caption: 'MULTI-TOUCH TRACKPAD • 2-FINGER SCROLL',
+          caption: 'MULTI-TOUCH TRACKPAD • 2-FINGER SCROLL • 3-FINGER GESTURES',
         ),
         _slot(_TrackpadSlot.lmb, p, s,
             x: 36, y: 320, w: 324, h: 56, radius: 12, fontSize: 12),
@@ -260,7 +261,7 @@ class _PcTrackpadScreenState extends State<PcTrackpadScreen> {
           y: 116,
           w: 353,
           h: 528,
-          caption: 'MULTI-TOUCH TRACKPAD • 2-FINGER SCROLL',
+          caption: 'MULTI-TOUCH TRACKPAD • 2-FINGER SCROLL • 3-FINGER GESTURES',
         ),
         _slot(_TrackpadSlot.lmb, p, s,
             x: 20,

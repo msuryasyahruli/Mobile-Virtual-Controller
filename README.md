@@ -1,67 +1,77 @@
 # VControllers (Flutter Android Client)
 
-Aplikasi controller gamepad wireless untuk Android berbasis Flutter yang terhubung ke PC Windows melalui WebSocket di jaringan WiFi lokal (`ws://<ip>:<port>`, default port `8765`) dan diteruskan ke virtual Xbox 360 controller menggunakan [Virtual Controller Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) (Python + ViGEmBus).
+Wireless gamepad, precision trackpad, and keyboard client for Android built with Flutter. Connects to a Windows PC or Mac running [Virtual Controller Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) over **local WiFi (WebSocket)** or **Bluetooth (RFCOMM SPP)**.
 
 ## Fitur Utama
 
+- **Dual Transport (WiFi & Bluetooth SPP)**:
+  - **WiFi WebSocket**: Koneksi LAN berlatensi rendah ke `ws://<ip>:<port>` (default port `8765`) dengan auto-reconnect setiap 3 detik.
+  - **Bluetooth RFCOMM SPP**: Koneksi langsung ke PC/Mac yang sudah di-pair di pengaturan Bluetooth Android (Android 12+ runtime permission & native bridge di `MainActivity.kt`).
 - **3 Preset Layout Controller**:
-  - **PlayStation (DualSense)**: Stick simetris, D-Pad recessed, tombol shapes (`△`, `○`, `✕`, `□`), Touchpad interaktif dengan lightbar, `SHARE`, `OPT`, `L1`/`L2`, `R1`/`R2`, macro `M1`/`M2`, serta tombol khusus `L3`/`R3`.
-  - **Xbox Series**: Stick asimetris, Hybrid D-Pad dish, tombol `Y`/`B`/`A`/`X`, `View`, `Menu`, `Share`, `LB`/`LT`, `RB`/`RT`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
-  - **Nintendo Switch Pro**: Stick asimetris dengan aksen Joy-Con (Neon Blue/Red), D-Pad, layout fisik Nintendo (`X` atas, `A` kanan, `B` bawah, `Y` kiri), `−`, `+`, Capture (`●`), `ZL`/`L`, `R`/`ZR`, macro `M1`/`M2`, serta tombol khusus `LS`/`RS`.
+  - **PlayStation (DualSense)**: Stick simetris, D-Pad recessed, tombol shapes (`△`, `○`, `✕`, `□`), Touchpad interaktif dengan lightbar, `SHARE`, `OPT`, `L1`/`L2`, `R1`/`R2`, macro `M1`/`M2`, dan `L3`/`R3`.
+  - **Xbox Series**: Stick asimetris, Hybrid D-Pad dish, `Y`/`B`/`A`/`X`, `View`, `Menu`, `Share`, `LB`/`LT`, `RB`/`RT`, macro `M1`/`M2`, dan `LS`/`RS`.
+  - **Nintendo Switch Pro**: Stick asimetris dengan aksen Joy-Con (Neon Blue/Red), D-Pad, layout fisik Nintendo (`X` atas, `A` kanan, `B` bawah, `Y` kiri), `−`, `+`, Capture (`●`), `ZL`/`L`, `R`/`ZR`, macro `M1`/`M2`, dan `LS`/`RS`.
 - **Trackpad, Mouse & Keyboard Suite (4 Mode)**:
-  - **Trackpad & Mouse**: Mendukung **Portrait (`393 × 852`)** & **Landscape (`852 × 393`)**, trackpad multi-touch full-width (1-jari gerak kursor dengan DPI `0.8x`–`2.0x`, 1-jari tap `LMB`, 2-jari tap `RMB`, 2-jari drag untuk scroll vertikal/horizontal, double-tap & tahan untuk drag lock), tombol fisik `LMB`/`MID`/`RMB`, `VOL −`/`VOL +`, `MIC`, serta quick nav Portrait (`◀ BACK`, `WIN / ⌘`, `FWD ▶`).
-  - **PC Keyboard (Win)** & **macOS Keyboard**: Keyboard mekanik 65% US QWERTY dengan overlay `FN`/`fn 🌐` (`F1`–`F12`), sticky/holdable modifiers (`SHIFT`, `CTRL`, `ALT`/`OPT`, `WIN`/`⌘ CMD`, `CAPS`), key-repeat `350ms`, shortcut OS (`COPY`, `PASTE`, `UNDO`, `ALT + TAB` / `SPOTLIGHT`, `TASK MGR` / `MISSION CTRL`), serta switch cepat `Win / macOS` dan `TRACKPAD`.
-  - **Hybrid WASD + Pad**: Cluster gaming kiri (`Q`/`W`/`E`/`R`, `A`/`S`/`D`/`F`, `SHIFT (SPRINT)`, `CTRL (CROUCH)`, `SPACE (JUMP)`) yang bekerja bersamaan dengan mouse/aim trackpad + `LMB`/`RMB` di kanan.
-- **Quick Menu Drawer (`☰`)**: Slide-over drawer kanan untuk mengganti preset controller maupun PC Suite, tema **Dark / Light Mode**, **Haptics**, **Gyro**, slider **Deadzone** (`0%` - `25%`), **HUD Opacity** (`20%` - `100%`), masuk **HUD Edit Mode** (`Smaller` / `Normal` / `Larger` + `Reset`), dan kembali ke **PC Pairing**.
-- **True Multi-Touch**: Menggunakan `Listener` per pointer ID sehingga trigger, bumper, kedua analog stick, D-Pad, tombol aksi, maupun WASD + trackpad dapat dipakai bersamaan tanpa konflik.
-- **Responsif & Aman Notch**: Skala proporsional berbasis `LayoutBuilder` (artboard referensi `852 × 393` landscape & `393 × 852` portrait Trackpad) dengan `SafeArea` dan padding simetris terhadap notch/status bar.
-- **Orientasi Otomatis**: Portrait di `ConnectScreen`, Landscape + `WakelockPlus` di `GamepadScreen` (dengan dukungan rotasi Portrait/Landscape khusus mode `Trackpad & Mouse`).
-- **Auto-Reconnect & Hemat Bandwidth**: Otomatis mencoba terhubung ulang setiap 3 detik saat koneksi terputus, dan hanya mengirim payload JSON ketika state input berubah.
+  - **Trackpad & Mouse**: Mendukung **Portrait (`393 × 852`)** dan **Landscape (`852 × 393`)** dengan trackpad multi-touch full-width bergaya Precision Touchpad:
+    - **1-Jari Drag**: Akselerasi balistik kontinu (`DPI 0.8x` - `2.0x`), filter smoothing adaptif, dan packet coalescing `8ms`.
+    - **1-Jari Tap / Double-Tap & Hold**: Left Click (`LMB`) dan Drag Lock.
+    - **2-Jari Tap & Drag**: Right Click (`RMB`), scroll vertikal/horizontal dengan axis lock, kinetic inertia, dan tap-to-brake tanpa klik tidak sengaja.
+    - **3-Jari Gestures**: 3-jari tap = Middle Click (`MID`), swipe atas = Task View (`META+TAB`), swipe bawah = Show Desktop (`META+D`), swipe kanan/kiri = Switch App (`ALT+TAB` / `ALT+SHIFT+TAB`).
+    - Tombol fisik `LMB`/`MID`/`RMB`, `VOL −`/`VOL +`, `MIC`, dan quick nav Portrait (`◀ BACK`, `WIN / ⌘`, `FWD ▶`).
+  - **PC Keyboard (Win)** & **macOS Keyboard**: Keyboard mekanik 65% US QWERTY dengan overlay `FN`/`fn 🌐` (`F1` - `F12`), sticky/holdable modifiers (`SHIFT`, `CTRL`, `ALT`/`OPT`, `WIN`/`⌘ CMD`, `CAPS`), key-repeat `350ms`, shortcut OS, serta switch cepat `Win / macOS` dan `TRACKPAD`.
+  - **Hybrid WASD + Pad**: Cluster gaming kiri (`Q`/`W`/`E`/`R`, `A`/`S`/`D`/`F`, `SHIFT (SPRINT)`, `CTRL (CROUCH)`, `SPACE (JUMP)`) simultan dengan aim trackpad + `LMB`/`RMB` di kanan.
+- **Quick Menu Drawer (`☰`)**: Slide-over drawer kanan untuk memilih preset controller maupun PC Suite, tema **Dark / Light Mode**, **Haptics**, **Gyro**, slider **Deadzone** (`0%` - `25%`), **HUD Opacity** (`20%` - `100%`), **HUD Edit Mode** (`Smaller` / `Normal` / `Larger` + `Reset`), dan **PC Pairing**.
+- **True Multi-Touch & Aman Notch**: Menggunakan raw `Listener` per pointer ID, skala artboard proporsional berbasis `LayoutBuilder`, `SafeArea`, dan `WakelockPlus`.
 
 ## Struktur Proyek
 
 ```text
 flutter-app/
 ├── android/
-│   └── app/src/main/AndroidManifest.xml        # Permission INTERNET, VIBRATE, WAKE_LOCK & cleartext LAN
+│   └── app/src/main/
+│       ├── AndroidManifest.xml                             # Permission INTERNET, BLUETOOTH, VIBRATE, WAKE_LOCK
+│       └── kotlin/com/example/vcontrollers/MainActivity.kt # Native Android Bluetooth RFCOMM SPP bridge
 ├── lib/
-│   ├── main.dart                               # Entry point, tema, routing '/' & '/gamepad'
+│   ├── main.dart                                           # Entry point, tema, routing '/' & '/gamepad'
 │   ├── models/
-│   │   └── gamepad_input.dart                  # Model state tombol & axis + toJson()
+│   │   └── gamepad_input.dart                              # Model state tombol & axis + toJson()
 │   ├── services/
-│   │   └── connection_service.dart             # WebSocket client, mouse/keyboard events, auto-reconnect
+│   │   └── connection_service.dart                         # Singleton WiFi WebSocket & Bluetooth SPP client
 │   ├── theme/
-│   │   ├── gamepad_theme.dart                  # Token warna PS/Xbox/Switch Pro/PC Suite (Light/Dark) & prefs
-│   │   └── pc_suite_theme.dart                 # Token warna Midnight Navy/Amber/Silver untuk PC Suite
+│   │   ├── gamepad_theme.dart                              # Token warna PS/Xbox/Switch/PC Suite (Light/Dark) & prefs
+│   │   └── pc_suite_theme.dart                             # Token Midnight Navy/Amber/Silver untuk PC Suite
 │   ├── screens/
-│   │   ├── connect_screen.dart                 # Input IP & Port PC Windows (portrait) + preset & tema
-│   │   ├── gamepad_screen.dart                 # Host screen, Quick Menu Drawer & HUD Edit toolbar
-│   │   ├── gamepad_layout_parts.dart           # Shared ArtboardCanvasShell, top status bar, utility buttons
-│   │   ├── playstation_gamepad_screen.dart     # Layout PlayStation DualSense
-│   │   ├── xbox_gamepad_screen.dart            # Layout Xbox Series
-│   │   ├── switch_pro_gamepad_screen.dart      # Layout Nintendo Switch Pro
-│   │   ├── pc_trackpad_screen.dart             # Mode Trackpad & Mouse (Portrait & Landscape)
-│   │   ├── pc_keyboard_screen.dart             # Mode Keyboard 65% US QWERTY (Windows & macOS)
-│   │   └── hybrid_wasd_trackpad_screen.dart    # Mode Hybrid Gaming WASD + Aim Trackpad
+│   │   ├── connect_screen.dart                             # Pairing WiFi/Bluetooth (portrait) + preset & tema
+│   │   ├── gamepad_screen.dart                             # Host screen, Quick Menu Drawer & HUD Edit toolbar
+│   │   ├── gamepad_layout_parts.dart                       # Shared ArtboardCanvasShell, status bar & utility buttons
+│   │   ├── playstation_gamepad_screen.dart                 # Layout PlayStation DualSense
+│   │   ├── xbox_gamepad_screen.dart                        # Layout Xbox Series
+│   │   ├── switch_pro_gamepad_screen.dart                  # Layout Nintendo Switch Pro
+│   │   ├── pc_trackpad_screen.dart                         # Mode Trackpad & Mouse (Portrait & Landscape)
+│   │   ├── pc_keyboard_screen.dart                         # Mode Keyboard 65% US QWERTY (Windows & macOS)
+│   │   └── hybrid_wasd_trackpad_screen.dart                # Mode Hybrid Gaming WASD + Aim Trackpad
 │   └── widgets/
-│       ├── dedicated_stick_click_button.dart   # Tombol pill L3/R3 & LS/RS
-│       ├── gamepad_dpad.dart                   # D-Pad 8-arah / diagonal slide
-│       ├── gamepad_face_buttons.dart           # Cluster tombol aksi diamond
-│       ├── gamepad_shoulder_button.dart        # Tombol L1/L2/R1/R2, LB/LT/RB/RT, ZL/L/R/ZR
-│       ├── gamepad_thumbstick.dart             # Analog stick multi-touch dengan radial deadzone
-│       ├── gamepad_touchpad.dart               # Touchpad DualSense dengan indikator sentuhan
-│       ├── pc_suite_parts.dart                 # Key button repeat, multi-touch trackpad & status pill
-│       └── quick_menu_drawer.dart              # Slide-over Quick Menu Drawer (Dark & Light mode)
+│       ├── dedicated_stick_click_button.dart               # Tombol pill L3/R3 & LS/RS
+│       ├── gamepad_dpad.dart                               # D-Pad 8-arah / diagonal slide
+│       ├── gamepad_face_buttons.dart                       # Cluster tombol aksi diamond
+│       ├── gamepad_shoulder_button.dart                    # Tombol L1/L2/R1/R2, LB/LT/RB/RT, ZL/L/R/ZR
+│       ├── gamepad_thumbstick.dart                         # Analog stick multi-touch dengan radial deadzone
+│       ├── gamepad_touchpad.dart                           # Touchpad DualSense dengan indikator sentuhan
+│       ├── pc_suite_parts.dart                             # Precision trackpad, key repeat button & status pill
+│       └── quick_menu_drawer.dart                          # Slide-over Quick Menu Drawer (Dark & Light mode)
 ├── test/
-│   └── widget_test.dart                        # Widget test ConnectScreen, layouts, QuickMenuDrawer & PC Suite
+│   ├── widget_test.dart                                    # Widget & gesture test semua screen & layout
+│   └── tdd_fixes_test.dart                                 # Regression tests untuk BT->WiFi, 3-jari, dan inertia
 ├── LICENSE
 └── pubspec.yaml
 ```
 
-## Protokol Komunikasi WebSocket
+## Protokol Komunikasi JSON
 
-- **URL**: `ws://<IP_PC_WINDOWS>:8765`
-- **Format JSON**:
+- **WiFi WebSocket**: `ws://<IP_SERVER>:8765`
+- **Bluetooth SPP**: Newline-delimited JSON melalui RFCOMM SPP
+
+### Gamepad Payload
 
 ```json
 {
@@ -93,46 +103,47 @@ flutter-app/
 }
 ```
 
-> Catatan: Pada layout PlayStation, `✕` dipetakan ke `A`, `○` ke `B`, `□` ke `X`, `△` ke `Y`, `SHARE`/Touchpad ke `SELECT`, dan `OPT` ke `START`. Pada layout Switch Pro, tata letak fisik Nintendo dipetakan sesuai standar (`B` bawah -> `A`, `A` kanan -> `B`, `Y` kiri -> `X`, `X` atas -> `Y`, `−` -> `SELECT`, `+` -> `START`).
+> Pemetaan tombol: pada PlayStation, `✕` -> `A`, `○` -> `B`, `□` -> `X`, `△` -> `Y`, `SHARE`/Touchpad -> `SELECT`, `OPT` -> `START`. Pada Switch Pro, `B` -> `A`, `A` -> `B`, `Y` -> `X`, `X` -> `Y`, `−` -> `SELECT`, `+` -> `START`.
 
-- **Format JSON PC Suite (Trackpad, Mouse & Keyboard)**:
-  - `{"type": "mouse_move", "dx": 4.2, "dy": -1.5}`
-  - `{"type": "mouse_button", "button": "left", "pressed": true}` (`left` | `middle` | `right`)
-  - `{"type": "mouse_scroll", "dx": 0.0, "dy": -6.0}`
-  - `{"type": "key", "key": "W", "pressed": true, "modifiers": ["SHIFT"]}`
-  - `{"type": "shortcut", "keys": ["CTRL", "C"]}`
+### PC Suite Payloads (Trackpad, Mouse & Keyboard)
+
+```json
+{"type": "mouse_move", "dx": 4.2, "dy": -1.5}
+{"type": "mouse_button", "button": "left", "pressed": true}
+{"type": "mouse_scroll", "dx": 0.0, "dy": -6.0}
+{"type": "key", "key": "W", "pressed": true, "modifiers": ["SHIFT"]}
+{"type": "shortcut", "keys": ["META", "TAB"]}
+```
 
 ## Prasyarat
 
 - Flutter SDK (Dart `>=3.2.0 <4.0.0`)
 - Android SDK & perangkat Android (atau emulator)
-- Server WebSocket penerima di PC Windows pada port `8765` dari repository [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) (atau server kustom apa pun yang mengikuti format protokol JSON di atas)
-- HP Android dan PC Windows terhubung di jaringan WiFi yang sama
+- Server penerima dari repository [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) di PC Windows atau Mac
+- WiFi lokal yang sama (untuk mode WiFi) atau perangkat sudah di-pair via Bluetooth (untuk mode Bluetooth)
 
 ## Cara Menjalankan
 
-1. **Siapkan & jalankan server WebSocket di PC Windows**
-   - Clone dan jalankan server dari repository resmi:
-     ```bash
-     git clone https://github.com/msuryasyahruli/Virtual-Controller-Server.git
-     ```
-   - Ikuti petunjuk instalasi di [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git) untuk menjalankan server pada port `8765` (atau port kustom).
-   - Pastikan Windows Firewall mengizinkan koneksi masuk TCP pada port yang digunakan dan catat alamat IP lokal PC Windows.
+1. **Siapkan & jalankan server di PC/Mac**:
+   ```sh
+   git clone https://github.com/msuryasyahruli/Virtual-Controller-Server.git
+   ```
+   Ikuti petunjuk instalasi di [Virtual-Controller-Server](https://github.com/msuryasyahruli/Virtual-Controller-Server.git), lalu jalankan server (default port `8765` untuk WiFi, atau aktifkan mode Bluetooth SPP).
 
 2. **Install dependensi & jalankan aplikasi Flutter**:
-   ```bash
+   ```sh
    flutter pub get
    flutter run
    ```
 
-3. **Hubungkan di HP**:
-   - Masukkan IP lokal dan port PC Windows pada layar `ConnectScreen`, lalu tekan **Connect to PC**.
-   - Setelah terhubung, aplikasi otomatis masuk ke `GamepadScreen` (landscape).
-   - Buka **Quick Menu Drawer** lewat tombol `☰` di top bar untuk mengganti preset **PS5 / Xbox / Switch**, tema **Light / Dark**, **Haptics**, **Gyro**, **Deadzone**, **HUD Opacity**, **Edit HUD Layout**, atau kembali ke **PC Pairing**.
+3. **Hubungkan dari HP**:
+   - **WiFi**: Pilih tab **WiFi**, masukkan IP dan port server, lalu tekan **Connect to PC**.
+   - **Bluetooth**: Pair PC/Mac di pengaturan Bluetooth Android, pilih tab **Bluetooth**, pilih perangkat, lalu tekan **Connect to PC**.
+   - Gunakan tombol `☰` untuk membuka **Quick Menu Drawer** dan berpindah antara preset **PS5 / Xbox / Switch**, **Trackpad**, **Win KB**, **macOS KB**, dan **Hybrid WASD**.
 
 ## Pengujian & Build APK
 
-```bash
+```sh
 flutter analyze --no-fatal-infos
 flutter test
 flutter build apk --debug

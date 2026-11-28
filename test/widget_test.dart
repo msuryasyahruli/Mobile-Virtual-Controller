@@ -5,7 +5,9 @@ import 'package:vcontrollers/main.dart';
 import 'package:vcontrollers/screens/connect_screen.dart';
 import 'package:vcontrollers/screens/gamepad_screen.dart';
 import 'package:vcontrollers/screens/pc_keyboard_screen.dart';
+import 'package:vcontrollers/services/connection_service.dart';
 import 'package:vcontrollers/theme/gamepad_theme.dart';
+import 'package:vcontrollers/theme/pc_suite_theme.dart';
 import 'package:vcontrollers/widgets/pc_suite_parts.dart';
 
 void main() {
@@ -397,6 +399,141 @@ void main() {
       expect(events[2].$3, isEmpty);
 
       tester.view.reset();
+    },
+  );
+
+  testWidgets(
+    'PcMultiTouchTrackpad delivers smooth 1-finger move and 2-finger scroll without stray cursor jump on lift',
+    (tester) async {
+      final moves = <Offset>[];
+      final scrolls = <Offset>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PcMultiTouchTrackpad(
+                palette: PcSuiteTheme.dark,
+                width: 400,
+                height: 240,
+                caption: 'TEST PAD',
+                onMouseMove: (dx, dy) => moves.add(Offset(dx, dy)),
+                onMouseButton: (_, __) {},
+                onMouseScroll: (dx, dy) => scrolls.add(Offset(dx, dy)),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final pad = find.byType(PcMultiTouchTrackpad);
+      final center = tester.getCenter(pad);
+
+      // 1-finger drag emits cursor movement.
+      final g = await tester.startGesture(center);
+      await g.moveBy(const Offset(18, 6), timeStamp: const Duration(milliseconds: 16));
+      await g.up(timeStamp: const Duration(milliseconds: 32));
+      await tester.pumpAndSettle();
+      expect(moves, isNotEmpty);
+
+      moves.clear();
+      scrolls.clear();
+
+      // 2-finger vertical drag emits scroll (with horizontal axis-locked to 0)
+      // and lifting 1 finger before the other must not emit stray mouse_move.
+      final g1 = await tester.startGesture(center + const Offset(-12, 0));
+      final g2 = await tester.startGesture(center + const Offset(12, 0));
+      await g1.moveBy(const Offset(1, 24), timeStamp: const Duration(milliseconds: 16));
+      await g2.moveBy(const Offset(1, 24), timeStamp: const Duration(milliseconds: 16));
+      await g1.up(timeStamp: const Duration(milliseconds: 32));
+      // Stray micro-move from remaining finger before lifting:
+      await g2.moveBy(const Offset(4, 4), timeStamp: const Duration(milliseconds: 40));
+      await g2.up(timeStamp: const Duration(milliseconds: 48));
+      await tester.pumpAndSettle();
+
+      expect(scrolls, isNotEmpty);
+      expect(scrolls.every((s) => s.dx == 0.0), isTrue);
+      expect(moves, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'PcMultiTouchTrackpad supports 3-finger tap (Middle Click) and 3-finger swipes (Task View, Desktop, Switch App)',
+    (tester) async {
+      final buttons = <(MouseButton, bool)>[];
+      final shortcuts = <List<String>>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PcMultiTouchTrackpad(
+                palette: PcSuiteTheme.dark,
+                width: 400,
+                height: 240,
+                caption: 'TEST PAD',
+                onMouseMove: (_, __) {},
+                onMouseButton: (btn, down) => buttons.add((btn, down)),
+                onMouseScroll: (_, __) {},
+                onShortcut: (keys) => shortcuts.add(keys),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final center = tester.getCenter(find.byType(PcMultiTouchTrackpad));
+
+      // 3-Finger Tap -> Middle Click
+      final t1 = await tester.startGesture(center + const Offset(-20, 0));
+      final t2 = await tester.startGesture(center);
+      final t3 = await tester.startGesture(center + const Offset(20, 0));
+      await t1.up();
+      await t2.up();
+      await t3.up();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(buttons, [(MouseButton.middle, true), (MouseButton.middle, false)]);
+
+      // 3-Finger Swipe Up -> Task View (META+TAB)
+      final u1 = await tester.startGesture(center + const Offset(-20, 20));
+      final u2 = await tester.startGesture(center + const Offset(0, 20));
+      final u3 = await tester.startGesture(center + const Offset(20, 20));
+      await u1.moveBy(const Offset(0, -60));
+      await u2.moveBy(const Offset(0, -60));
+      await u3.moveBy(const Offset(0, -60));
+      await u1.up();
+      await u2.up();
+      await u3.up();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(shortcuts.last, ['META', 'TAB']);
+
+      // 3-Finger Swipe Down -> Show Desktop (META+D)
+      final d1 = await tester.startGesture(center + const Offset(-20, -20));
+      final d2 = await tester.startGesture(center + const Offset(0, -20));
+      final d3 = await tester.startGesture(center + const Offset(20, -20));
+      await d1.moveBy(const Offset(0, 60));
+      await d2.moveBy(const Offset(0, 60));
+      await d3.moveBy(const Offset(0, 60));
+      await d1.up();
+      await d2.up();
+      await d3.up();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(shortcuts.last, ['META', 'D']);
+
+      // 3-Finger Swipe Right -> Switch App Next (ALT+TAB)
+      final r1 = await tester.startGesture(center + const Offset(-30, -10));
+      final r2 = await tester.startGesture(center + const Offset(-30, 0));
+      final r3 = await tester.startGesture(center + const Offset(-30, 10));
+      await r1.moveBy(const Offset(65, 0));
+      await r2.moveBy(const Offset(65, 0));
+      await r3.moveBy(const Offset(65, 0));
+      await r1.up();
+      await r2.up();
+      await r3.up();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(shortcuts.last, ['ALT', 'TAB']);
     },
   );
 }

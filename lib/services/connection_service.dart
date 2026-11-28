@@ -1,38 +1,87 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../models/gamepad_input.dart';
 
-/// Physical mouse button identifiers sent over the WebSocket protocol.
-enum MouseButton { left, middle, right }
+/// Physical mouse buttons sent over the PC input protocol.
+enum MouseButton {
+  /// The primary (left) mouse button.
+  left,
 
-/// Status koneksi WebSocket ke server PC Windows.
+  /// The middle (wheel) mouse button.
+  middle,
+
+  /// The secondary (right) mouse button.
+  right,
+}
+
+/// Transport layers used to reach the VControllers server.
+enum ConnectionTransport {
+  /// Local network WebSocket connection.
+  wifi,
+
+  /// Android Bluetooth RFCOMM SPP connection.
+  bluetooth,
+}
+
+/// Metadata for a paired Bluetooth device.
+class BluetoothDeviceInfo {
+  /// The human-readable name of the device.
+  final String name;
+
+  /// The Bluetooth MAC address of the device.
+  final String address;
+
+  /// Creates a [BluetoothDeviceInfo] with the given [name] and [address].
+  const BluetoothDeviceInfo({
+    required this.name,
+    required this.address,
+  });
+}
+
+/// Connection states for [ConnectionService].
 enum ConnectionStatus {
+  /// Actively connected to the server.
   connected,
+
+  /// Not connected to any server.
   disconnected,
+
+  /// Attempting to establish or restore a connection.
   reconnecting,
 }
 
-/// Service singleton untuk mengelola koneksi WebSocket dan pengiriman input gamepad.
+/// Manages WiFi WebSocket and Bluetooth SPP connections to the PC server.
+///
+/// Use [ConnectionService.instance] or [ConnectionService.new] to access the
+/// shared singleton across screens.
 class ConnectionService {
-  /// Port default server WebSocket Python pada PC Windows.
+  /// The default WebSocket port used by the VControllers server (`8765`).
   static const int serverPort = 8765;
 
-  /// Interval auto-reconnect saat koneksi terputus.
+  /// The delay between automatic WiFi reconnect attempts.
   static const Duration reconnectInterval = Duration(seconds: 3);
 
-  /// Timeout handshake WebSocket agar tidak menggantung pada IP yang tidak aktif.
+  /// The maximum time to wait for a WebSocket handshake before timing out.
   static const Duration connectTimeout = Duration(seconds: 5);
 
   static const String _lastIpPrefKey = 'vcontrollers_last_ip';
   static const String _lastPortPrefKey = 'vcontrollers_last_port';
+  static const String _lastBtAddrPrefKey = 'vcontrollers_last_bt_addr';
 
-  /// Instance tunggal [ConnectionService] yang digunakan bersama antar screen.
+  static const MethodChannel _btMethodChannel =
+      MethodChannel('com.example.vcontrollers/bluetooth');
+  static const EventChannel _btEventChannel =
+      EventChannel('com.example.vcontrollers/bluetooth_events');
+
+  /// The shared singleton [ConnectionService] instance.
   static final ConnectionService instance = ConnectionService._internal();
 
+  /// Returns the shared [instance].
   factory ConnectionService() => instance;
 
   ConnectionService._internal();
@@ -45,63 +94,151 @@ class ConnectionService {
   SharedPreferences? _prefs;
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _channelSubscription;
+  StreamSubscription<dynamic>? _btEventSubscription;
   Timer? _reconnectTimer;
 
+  ConnectionTransport _transport = ConnectionTransport.wifi;
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _currentIp;
   int _currentPort = serverPort;
+  String? _currentBtAddress;
+  String? _currentBtName;
   String? _lastError;
   bool _shouldReconnect = false;
   int _connectionGeneration = 0;
 
-  /// Stream perubahan status koneksi WebSocket.
+  /// A broadcast stream of [ConnectionStatus] updates.
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
 
-  /// Stream pesan error dari server (misalnya penolakan client kedua).
+  /// A broadcast stream of server rejection or transport error messages.
   Stream<String?> get errorStream => _errorController.stream;
 
-  /// Status koneksi saat ini.
+  /// The active [ConnectionTransport].
+  ConnectionTransport get currentTransport => _transport;
+
+  /// The current [ConnectionStatus].
   ConnectionStatus get currentStatus => _status;
 
-  /// Alamat IP server yang sedang digunakan atau terakhir dihubungkan.
+  /// The IPv4 address of the active or most recently targeted WiFi server.
   String? get currentIp => _currentIp;
 
-  /// Port server yang sedang digunakan atau terakhir dihubungkan.
+  /// The TCP port of the active or most recently targeted WiFi server.
   int get currentPort => _currentPort;
 
-  /// Pesan error terakhir dari server jika ada.
+  /// The Bluetooth MAC address of the active or last targeted device.
+  String? get currentBluetoothAddress => _currentBtAddress;
+
+  /// The display name of the active Bluetooth device, if known.
+  String? get currentBluetoothName => _currentBtName;
+
+  /// The most recent server or transport error message, or `null` if none.
   String? get lastError => _lastError;
 
-  /// Inisialisasi SharedPreferences untuk menyimpan dan memuat IP terakhir.
+  /// Initializes [SharedPreferences] for persisting connection settings.
+  ///
+  /// Uses [prefs] when provided; otherwise obtains the default instance.
   Future<void> init([SharedPreferences? prefs]) async {
     _prefs = prefs ?? await SharedPreferences.getInstance();
   }
 
-  /// Memuat alamat IP terakhir yang tersimpan di SharedPreferences.
+  /// Loads the last saved server IP address, or returns an empty string.
   Future<String> loadLastIp() async {
     _prefs ??= await SharedPreferences.getInstance();
     return _prefs?.getString(_lastIpPrefKey) ?? '';
   }
 
-  /// Menyimpan alamat IP terakhir ke SharedPreferences.
+  /// Persists the trimmed [ip] address to local preferences.
   Future<void> saveLastIp(String ip) async {
     _prefs ??= await SharedPreferences.getInstance();
     await _prefs?.setString(_lastIpPrefKey, ip.trim());
   }
 
-  /// Memuat port terakhir yang tersimpan di SharedPreferences.
+  /// Loads the last saved server port, defaulting to [serverPort].
   Future<int> loadLastPort() async {
     _prefs ??= await SharedPreferences.getInstance();
     return _prefs?.getInt(_lastPortPrefKey) ?? serverPort;
   }
 
-  /// Menyimpan port terakhir ke SharedPreferences.
+  /// Persists [port] to local preferences.
   Future<void> saveLastPort(int port) async {
     _prefs ??= await SharedPreferences.getInstance();
     await _prefs?.setInt(_lastPortPrefKey, port);
   }
 
-  /// Membuka koneksi WebSocket ke `ws://<ip>:<port>` dan mengaktifkan auto-reconnect.
+  /// Loads the last saved Bluetooth MAC address, or returns an empty string.
+  Future<String> loadLastBtAddress() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs?.getString(_lastBtAddrPrefKey) ?? '';
+  }
+
+  /// Persists the trimmed Bluetooth [address] to local preferences.
+  Future<void> saveLastBtAddress(String address) async {
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs?.setString(_lastBtAddrPrefKey, address.trim());
+  }
+
+  /// Returns whether the device has a Bluetooth adapter.
+  Future<bool> isBluetoothAvailable() async {
+    try {
+      return await _btMethodChannel.invokeMethod<bool>('isAvailable') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Returns whether Bluetooth is currently enabled on the device.
+  Future<bool> isBluetoothEnabled() async {
+    try {
+      return await _btMethodChannel.invokeMethod<bool>('isEnabled') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Returns whether runtime Bluetooth permission has been granted.
+  Future<bool> hasBluetoothPermission() async {
+    try {
+      return await _btMethodChannel.invokeMethod<bool>('hasPermission') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Requests runtime Bluetooth permission from the user.
+  Future<bool> requestBluetoothPermission() async {
+    try {
+      return await _btMethodChannel.invokeMethod<bool>('requestPermission') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Returns the paired [BluetoothDeviceInfo] entries reported by the OS.
+  Future<List<BluetoothDeviceInfo>> getPairedBluetoothDevices() async {
+    try {
+      final rawList =
+          await _btMethodChannel.invokeMethod<List<dynamic>>('getPairedDevices');
+      if (rawList == null) return const [];
+      return rawList
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (item) => BluetoothDeviceInfo(
+              name: (item['name'] ?? 'Unknown Device').toString(),
+              address: (item['address'] ?? '').toString(),
+            ),
+          )
+          .where((d) => d.address.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Connects to `ws://[ip]:[port]` and enables automatic reconnection.
+  ///
+  /// Falls back to [serverPort] if [port] is outside `1`..`65535`.
   Future<void> connect(String ip, {int port = serverPort}) async {
     final sanitizedIp = ip.trim();
     if (sanitizedIp.isEmpty) {
@@ -119,10 +256,35 @@ class ConnectionService {
 
     _cancelReconnectTimer();
     await _closeChannel();
+    _transport = ConnectionTransport.wifi;
     await _openConnection(sanitizedIp, _currentPort);
   }
 
-  /// Menutup koneksi secara manual dan mematikan auto-reconnect.
+  /// Membuka koneksi Bluetooth SPP ke perangkat PC yang sudah di-pair.
+  /// Connects over Bluetooth RFCOMM SPP to the paired device at [address].
+  ///
+  /// Stores [deviceName] for display while connected.
+  Future<void> connectBluetooth(String address, {String? deviceName}) async {
+    final sanitizedAddr = address.trim();
+    if (sanitizedAddr.isEmpty) {
+      _updateStatus(ConnectionStatus.disconnected);
+      return;
+    }
+
+    _transport = ConnectionTransport.bluetooth;
+    _currentBtAddress = sanitizedAddr;
+    _currentBtName = deviceName;
+    _setError(null);
+    _shouldReconnect = false;
+    _connectionGeneration++;
+    await saveLastBtAddress(sanitizedAddr);
+
+    _cancelReconnectTimer();
+    await _closeChannel();
+    await _openBluetoothConnection(sanitizedAddr);
+  }
+
+  /// Closes the active connection and disables automatic reconnection.
   Future<void> disconnect() async {
     _shouldReconnect = false;
     _setError(null);
@@ -132,12 +294,12 @@ class ConnectionService {
     _updateStatus(ConnectionStatus.disconnected);
   }
 
-  /// Mengirim state [GamepadInput] sebagai JSON; mengabaikan error jika terputus.
+  /// Sends the canonical gamepad [input] payload when connected.
   void sendInput(GamepadInput input) {
     _sendJson(input.toJson());
   }
 
-  /// Mengirim delta pergerakan mouse relatif dari trackpad.
+  /// Sends a relative cursor movement delta ([dx], [dy]) from the trackpad.
   void sendMouseMove(double dx, double dy) {
     if (dx == 0.0 && dy == 0.0) return;
     _sendJson({
@@ -147,7 +309,7 @@ class ConnectionService {
     });
   }
 
-  /// Mengirim event tekan/lepas tombol mouse ([MouseButton]).
+  /// Sends a press or release event for [button] based on [pressed].
   void sendMouseButton(MouseButton button, bool pressed) {
     _sendJson({
       'type': 'mouse_button',
@@ -156,7 +318,7 @@ class ConnectionService {
     });
   }
 
-  /// Mengirim event scroll wheel vertikal/horizontal dari trackpad.
+  /// Sends a scroll wheel delta ([dx], [dy]) from the trackpad.
   void sendMouseScroll(double dx, double dy) {
     if (dx == 0.0 && dy == 0.0) return;
     _sendJson({
@@ -166,7 +328,10 @@ class ConnectionService {
     });
   }
 
-  /// Mengirim event keyboard tekan/lepas beserta modifier aktif.
+  /// Sends a keyboard [key] press or release event with optional [modifiers].
+  ///
+  /// Sets the `pressed` flag to [pressed] and includes [modifiers] when
+  /// non-empty.
   void sendKeyEvent(
     String key,
     bool pressed, {
@@ -180,7 +345,7 @@ class ConnectionService {
     });
   }
 
-  /// Mengirim kombinasi shortcut keyboard sekaligus (mis. `Ctrl+C`, `Cmd+Space`).
+  /// Sends a simultaneous keyboard shortcut for [keys] (e.g. `['CTRL', 'C']`).
   void sendShortcut(List<String> keys) {
     if (keys.isEmpty) return;
     _sendJson({
@@ -190,14 +355,72 @@ class ConnectionService {
   }
 
   void _sendJson(Map<String, dynamic> payload) {
-    if (_status != ConnectionStatus.connected || _channel == null) {
+    if (_status != ConnectionStatus.connected) {
       return;
     }
 
     try {
-      _channel!.sink.add(jsonEncode(payload));
+      final encoded = jsonEncode(payload);
+      if (_transport == ConnectionTransport.bluetooth) {
+        unawaited(
+          _btMethodChannel.invokeMethod<bool>('send', {'payload': encoded}),
+        );
+        return;
+      }
+      if (_channel == null) return;
+      _channel!.sink.add(encoded);
     } catch (_) {
       // Abaikan error pengiriman saat koneksi sedang terputus atau tertutup.
+    }
+  }
+
+  /// Membuka koneksi Bluetooth RFCOMM SPP lewat MethodChannel native Android.
+  Future<void> _openBluetoothConnection(String address) async {
+    final generation = ++_connectionGeneration;
+    _updateStatus(ConnectionStatus.reconnecting);
+
+    try {
+      await _btEventSubscription?.cancel();
+      _btEventSubscription = _btEventChannel.receiveBroadcastStream().listen(
+        (event) => _handleBluetoothEvent(event, generation),
+        onError: (_) => _handleUnexpectedDisconnect(generation),
+      );
+
+      final ok = await _btMethodChannel.invokeMethod<bool>('connect', {
+            'address': address,
+            'channel': 5,
+          }) ??
+          false;
+
+      if (generation != _connectionGeneration) return;
+      if (!ok) {
+        _setError('Failed to connect via Bluetooth');
+        _updateStatus(ConnectionStatus.disconnected);
+        return;
+      }
+
+      _updateStatus(ConnectionStatus.connected);
+    } on PlatformException catch (e) {
+      if (generation == _connectionGeneration) {
+        _setError(e.message ?? 'Bluetooth connection failed');
+        _updateStatus(ConnectionStatus.disconnected);
+      }
+    } catch (_) {
+      if (generation == _connectionGeneration) {
+        _setError('Bluetooth connection failed');
+        _updateStatus(ConnectionStatus.disconnected);
+      }
+    }
+  }
+
+  void _handleBluetoothEvent(dynamic event, int generation) {
+    if (generation != _connectionGeneration) return;
+    if (event is! Map) return;
+    final type = event['type']?.toString();
+    if (type == 'message') {
+      _handleServerMessage(event['data'], generation);
+    } else if (type == 'disconnected') {
+      _updateStatus(ConnectionStatus.disconnected);
     }
   }
 
@@ -320,6 +543,17 @@ class ConnectionService {
       // Abaikan error saat menutup subscription.
     }
     _channelSubscription = null;
+
+    try {
+      await _btEventSubscription?.cancel();
+    } catch (_) {}
+    _btEventSubscription = null;
+
+    if (_transport == ConnectionTransport.bluetooth) {
+      try {
+        await _btMethodChannel.invokeMethod<bool>('disconnect');
+      } catch (_) {}
+    }
 
     await _safeCloseSpecificChannel(_channel);
     _channel = null;

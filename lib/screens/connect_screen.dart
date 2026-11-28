@@ -6,10 +6,13 @@ import 'package:flutter/services.dart';
 import '../services/connection_service.dart';
 import '../theme/gamepad_theme.dart';
 
-/// Halaman awal portrait untuk memasukkan alamat IP & port server VControllers
-/// menggunakan design system yang seragam dengan [GamepadScreen] (Light/Dark + preset).
+/// Portrait screen for pairing with a VControllers server over WiFi or Bluetooth.
+///
+/// Allows entering a server IP and port or choosing a paired Bluetooth device,
+/// selecting a [GamepadStyle], and toggling light or dark mode before navigating
+/// to `/gamepad`.
 class ConnectScreen extends StatefulWidget {
-  /// Membuat [ConnectScreen].
+  /// Creates a [ConnectScreen].
   const ConnectScreen({super.key});
 
   @override
@@ -32,6 +35,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
   GamepadStyle _style = GamepadStyle.playstation;
   GamepadButtonSize _buttonSize = GamepadButtonSize.normal;
   bool _isDark = true;
+
+  ConnectionTransport _transport = ConnectionTransport.wifi;
+  List<BluetoothDeviceInfo> _btDevices = const [];
+  String? _selectedBtAddress;
+  bool _btLoading = false;
+  bool _btPermissionGranted = true;
+  bool _btEnabled = true;
 
   String? _ipError;
   String? _portError;
@@ -57,10 +67,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
-  /// Memuat IP/port terakhir serta preferensi tampilan bersama.
+  /// Memuat IP/port/Bluetooth terakhir serta preferensi tampilan bersama.
   Future<void> _loadInitialData() async {
     final lastIp = await _connectionService.loadLastIp();
     final lastPort = await _connectionService.loadLastPort();
+    final lastBtAddr = await _connectionService.loadLastBtAddress();
     final appearance = await GamepadAppearancePrefs.load();
     if (!mounted) return;
     setState(() {
@@ -68,9 +79,38 @@ class _ConnectScreenState extends State<ConnectScreen> {
         _ipController.text = lastIp;
       }
       _portController.text = lastPort.toString();
+      if (lastBtAddr.isNotEmpty) {
+        _selectedBtAddress = lastBtAddr;
+      }
       _style = appearance.style;
       _isDark = appearance.isDark;
       _buttonSize = appearance.buttonSize;
+    });
+  }
+
+  /// Memuat daftar perangkat Bluetooth yang sudah di-pair di Android.
+  Future<void> _refreshBluetoothDevices({bool askPermission = false}) async {
+    setState(() => _btLoading = true);
+    var hasPerm = await _connectionService.hasBluetoothPermission();
+    if (!hasPerm && askPermission) {
+      hasPerm = await _connectionService.requestBluetoothPermission();
+    }
+    final enabled = await _connectionService.isBluetoothEnabled();
+    final devices = (hasPerm && enabled)
+        ? await _connectionService.getPairedBluetoothDevices()
+        : const <BluetoothDeviceInfo>[];
+
+    if (!mounted) return;
+    setState(() {
+      _btLoading = false;
+      _btPermissionGranted = hasPerm;
+      _btEnabled = enabled;
+      _btDevices = devices;
+      if (devices.isNotEmpty &&
+          (_selectedBtAddress == null ||
+              !devices.any((d) => d.address == _selectedBtAddress))) {
+        _selectedBtAddress = devices.first.address;
+      }
     });
   }
 
@@ -143,8 +183,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return true;
   }
 
-  /// Memulai koneksi ke server WebSocket dengan IP dan port dari form.
+  /// Memulai koneksi ke server WebSocket atau Bluetooth SPP sesuai tab aktif.
   Future<void> _handleConnect() async {
+    if (_transport == ConnectionTransport.bluetooth) {
+      final addr = _selectedBtAddress?.trim() ?? '';
+      if (addr.isEmpty) {
+        setState(() {
+          _serverError = 'Select a paired PC or Mac first';
+        });
+        return;
+      }
+      FocusScope.of(context).unfocus();
+      setState(() {
+        _ipError = null;
+        _portError = null;
+        _serverError = null;
+      });
+      final matched = _btDevices
+          .where((d) => d.address == addr)
+          .map((d) => d.name)
+          .firstOrNull;
+      await _connectionService.connectBluetooth(addr, deviceName: matched);
+      return;
+    }
+
     final ip = _ipController.text.trim();
     final portText = _portController.text.trim();
     final port = int.tryParse(portText);
@@ -178,37 +240,49 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await _connectionService.disconnect();
   }
 
-  /// Mengembalikan status jujur beserta penyebab/aksi berikutnya.
+  /// Returns connection status title, detail, and indicator color.
   ({Color color, String title, String detail}) _statusInfo(GamepadTheme theme) {
+    final isBt = _transport == ConnectionTransport.bluetooth;
     final ip = _ipController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ??
         ConnectionService.serverPort;
+    final target = isBt
+        ? (_btDevices
+                .where((d) => d.address == _selectedBtAddress)
+                .map((d) => d.name)
+                .firstOrNull ??
+            'Bluetooth device')
+        : '$ip:$port';
 
     switch (_status) {
       case ConnectionStatus.connected:
         return (
           color: theme.statusAccent,
           title: 'Connected',
-          detail: 'Opening controller layout for $ip:$port',
+          detail: 'Opening controller for $target',
         );
       case ConnectionStatus.reconnecting:
         return (
           color: const Color(0xFFD97706),
-          title: 'Connecting to $ip:$port',
-          detail: 'Waiting for VControllers server on your local WiFi',
+          title: 'Connecting to $target',
+          detail: isBt
+              ? 'Waiting for VControllers server over Bluetooth'
+              : 'Waiting for VControllers server on your local WiFi',
         );
       case ConnectionStatus.disconnected:
         if (_serverError != null && _serverError!.isNotEmpty) {
           return (
             color: theme.disconnectColor,
-            title: 'Connection rejected',
-            detail: '$_serverError. Disconnect the other device and try again.',
+            title: 'Connection failed',
+            detail: '$_serverError.',
           );
         }
         return (
           color: theme.textSecondary,
           title: 'Ready to connect',
-          detail: 'Start VControllers on Windows, then enter the IP shown there.',
+          detail: isBt
+              ? 'Start VControllers on your PC or Mac, then pick it below.'
+              : 'Start VControllers on your PC or Mac, then enter its IP.',
         );
     }
   }
@@ -230,7 +304,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       ),
       decoration: _inputDecoration(
         theme: theme,
-        label: 'Windows PC IP',
+        label: 'Server IP',
         hint: '192.168.1.100',
         errorText: _ipError,
       ),
@@ -332,10 +406,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
               final isCompactWidth = constraints.maxWidth < 360;
               final isShortHeight = constraints.maxHeight < 620;
               final isTight = isCompactWidth || isShortHeight;
-              final horizontalPadding = isCompactWidth ? 14.0 : 24.0;
-              final verticalPadding = isTight ? 12.0 : 20.0;
-              final cardPadding = isTight ? 14.0 : 22.0;
-              final sectionGap = isTight ? 12.0 : 18.0;
+              final horizontalPadding = isCompactWidth ? 12.0 : 24.0;
+              final verticalPadding = isTight ? 8.0 : 20.0;
+              final cardPadding = isTight ? 12.0 : 22.0;
+              final sectionGap = isTight ? 8.0 : 16.0;
 
               return Center(
                 child: SingleChildScrollView(
@@ -368,7 +442,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Wireless PC gamepad over local WiFi',
+                                    'PC & Mac controller over WiFi or Bluetooth',
                                     style: TextStyle(
                                       color: theme.textSecondary,
                                       fontSize: isTight ? 12 : 13,
@@ -417,7 +491,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                         ),
                         SizedBox(height: sectionGap),
 
-                        // Panel koneksi utama: flat hardware surface, border 1px.
+                        // Main connection panel.
                         Container(
                           padding: EdgeInsets.all(cardPadding),
                           decoration: BoxDecoration(
@@ -431,7 +505,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Status koneksi aktual (tanpa glow dekoratif).
+                              // Current connection status.
                               Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -492,8 +566,59 @@ class _ConnectScreenState extends State<ConnectScreen> {
                               ),
                               SizedBox(height: sectionGap),
 
-                              // Input IP & Port responsif: stack vertikal di layar sempit (< 360dp).
-                              if (isCompactWidth) ...[
+                              // Transport switcher: WiFi (WebSocket) / Bluetooth (SPP).
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildTransportChip(
+                                      theme: theme,
+                                      label: 'WiFi',
+                                      icon: Icons.wifi_rounded,
+                                      selected:
+                                          _transport == ConnectionTransport.wifi,
+                                      onTap: () {
+                                        if (_transport ==
+                                            ConnectionTransport.wifi) return;
+                                        HapticFeedback.selectionClick();
+                                        setState(() {
+                                          _transport = ConnectionTransport.wifi;
+                                          _serverError = null;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildTransportChip(
+                                      theme: theme,
+                                      label: 'Bluetooth',
+                                      icon: Icons.bluetooth_rounded,
+                                      selected: _transport ==
+                                          ConnectionTransport.bluetooth,
+                                      onTap: () {
+                                        if (_transport ==
+                                            ConnectionTransport.bluetooth) {
+                                          return;
+                                        }
+                                        HapticFeedback.selectionClick();
+                                        setState(() {
+                                          _transport =
+                                              ConnectionTransport.bluetooth;
+                                          _serverError = null;
+                                        });
+                                        _refreshBluetoothDevices(
+                                          askPermission: true,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: sectionGap),
+
+                              if (_transport == ConnectionTransport.bluetooth)
+                                _buildBluetoothSection(theme)
+                              else if (isCompactWidth) ...[
                                 _buildIpField(theme),
                                 const SizedBox(height: 10),
                                 _buildPortField(theme),
@@ -639,9 +764,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   }).toList(),
                                 ),
                               ),
-                              SizedBox(height: isTight ? 14 : 20),
+                              SizedBox(height: isTight ? 10 : 18),
 
-                              // Tombol aksi utama: tinggi 48dp, warna aksen konsisten.
+                              // Primary connect action.
                               Row(
                                 children: [
                                   Expanded(
@@ -725,6 +850,135 @@ class _ConnectScreenState extends State<ConnectScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTransportChip({
+    required GamepadTheme theme,
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 40,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 16),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected
+              ? theme.statusAccent.withValues(alpha: 0.14)
+              : theme.buttonFill,
+          foregroundColor: selected ? theme.statusAccent : theme.textPrimary,
+          side: BorderSide(
+            color: selected ? theme.statusAccent : theme.buttonBorder,
+            width: selected ? 1.5 : 1.0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(GamepadRadii.lg),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBluetoothSection(GamepadTheme theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Paired device',
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _btLoading
+                  ? null
+                  : () => _refreshBluetoothDevices(askPermission: true),
+              icon: _btLoading
+                  ? SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.statusAccent,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(
+                _btPermissionGranted ? 'Refresh' : 'Grant Permission',
+                style: const TextStyle(fontSize: 11.5),
+              ),
+            ),
+          ],
+        ),
+        if (!_btPermissionGranted)
+          Text(
+            'Allow Bluetooth access to list paired devices.',
+            style: TextStyle(color: theme.disconnectColor, fontSize: 12),
+          )
+        else if (!_btEnabled)
+          Text(
+            'Turn on Bluetooth on your phone, then tap Refresh.',
+            style: TextStyle(color: theme.disconnectColor, fontSize: 12),
+          )
+        else if (_btDevices.isEmpty)
+          Text(
+            'No paired devices found. Pair your PC or Mac in Android Bluetooth settings first.',
+            style: TextStyle(color: theme.textSecondary, fontSize: 12),
+          )
+        else
+          DropdownButtonFormField<String>(
+            initialValue: _btDevices.any((d) => d.address == _selectedBtAddress)
+                ? _selectedBtAddress
+                : _btDevices.first.address,
+            dropdownColor: theme.plateFill,
+            style: TextStyle(color: theme.textPrimary, fontSize: 13.5),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.buttonFill,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(GamepadRadii.lg),
+                borderSide: BorderSide(color: theme.buttonBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(GamepadRadii.lg),
+                borderSide: BorderSide(color: theme.buttonBorder),
+              ),
+            ),
+            items: _btDevices
+                .map(
+                  (d) => DropdownMenuItem<String>(
+                    value: d.address,
+                    child: Text(
+                      '${d.name} (${d.address})',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedBtAddress = val;
+                _serverError = null;
+              });
+            },
+          ),
+      ],
     );
   }
 }
